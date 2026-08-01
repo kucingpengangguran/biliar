@@ -31,6 +31,99 @@
             padding: 4px;
         }
 
+        /* LOBBY / MENU UTAMA STYLES (ELEGANT & TANPA EMOJI) */
+        #lobby-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #090e17 0%, #121f33 100%);
+            z-index: 200;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+        }
+        .lobby-title {
+            font-size: 22px;
+            font-weight: 800;
+            color: #ffffff;
+            margin-bottom: 6px;
+            letter-spacing: 2px;
+            text-align: center;
+        }
+        .lobby-subtitle {
+            font-size: 11px;
+            color: #64748b;
+            margin-bottom: 35px;
+            text-align: center;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+        .lobby-btn {
+            width: 100%;
+            max-width: 260px;
+            padding: 13px;
+            margin: 6px 0;
+            background: transparent;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            color: #f8fafc;
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 1px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .lobby-btn:hover, .lobby-btn:active {
+            background: #ffffff;
+            color: #0d1626;
+            border-color: #ffffff;
+            transform: scale(0.98);
+        }
+        .lobby-btn.primary {
+            background: #2563eb;
+            border-color: #2563eb;
+            color: #ffffff;
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+        }
+        .lobby-btn.primary:hover, .lobby-btn.primary:active {
+            background: #1d4ed8;
+        }
+        
+        .difficulty-box {
+            display: none;
+            flex-direction: column;
+            width: 100%;
+            max-width: 260px;
+            animation: fadeIn 0.15s ease;
+            margin-top: 5px;
+        }
+        .diff-btn {
+            padding: 10px;
+            margin: 4px 0;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            cursor: pointer;
+            color: #cbd5e1;
+            transition: all 0.15s ease;
+        }
+        .diff-btn:hover {
+            background: rgba(255, 255, 255, 0.15);
+            color: #ffffff;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(4px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
         .top-notification {
             width: 85%;
             max-width: 290px;
@@ -258,6 +351,21 @@
 <body>
 
     <div class="game-container">
+        <!-- LOBBY / MENU UTAMA (ELEGANT TANPA EMOJI) -->
+        <div id="lobby-screen">
+            <div class="lobby-title">8 BALL POOL PRO</div>
+            <div class="lobby-subtitle">Select Match Mode</div>
+            
+            <button class="lobby-btn primary" id="btn-mode-pvp">PVP MATCH (Lawan Teman)</button>
+            <button class="lobby-btn" id="btn-mode-bot">VS BOT (Lawan AI)</button>
+
+            <div id="difficulty-container" class="difficulty-box">
+                <button class="diff-btn" onclick="startBotGame('easy')">EASY (Pemula)</button>
+                <button class="diff-btn" onclick="startBotGame('medium')">MEDIUM (Menengah)</button>
+                <button class="diff-btn" onclick="startBotGame('hard')">HARD (Pro / Presisi)</button>
+            </div>
+        </div>
+
         <div id="top-notif" class="top-notification">
             <div id="notif-title" class="notif-title">MISSED</div>
             <div id="notif-sub" class="notif-sub">Tidak ada bola masuk</div>
@@ -266,7 +374,7 @@
         <div class="top-players-hud">
             <div id="p1-side" class="player-side-group active-turn">
                 <div class="avatar-box">
-                    <div class="score-text">P1</div>
+                    <div id="p1-label" class="score-text">P1</div>
                     <div class="avatar">👤</div>
                 </div>
                 <div id="p1-balls" class="ball-slot-horizontal"></div>
@@ -277,7 +385,7 @@
             <div id="p2-side" class="player-side-group p2-side">
                 <div id="p2-balls" class="ball-slot-horizontal"></div>
                 <div class="avatar-box">
-                    <div class="score-text">P2</div>
+                    <div id="p2-label" class="score-text">P2</div>
                     <div class="avatar">👤</div>
                 </div>
             </div>
@@ -305,7 +413,6 @@
         }
 
         const BACKEND_URL = 'https://xxxx.ngrok-free.app'; 
-
         const urlParams = new URLSearchParams(window.location.search);
         let chatId = '12345678';
         
@@ -318,7 +425,32 @@
 
         const currentUserId = tg?.initDataUnsafe?.user?.id || 0;
 
+        let gameMode = 'pvp'; 
+        let botDifficulty = 'medium'; 
+        let isBotThinking = false;
+
+        document.getElementById('btn-mode-pvp').addEventListener('click', () => {
+            gameMode = 'pvp';
+            document.getElementById('p2-label').innerText = 'P2';
+            document.getElementById('lobby-screen').style.display = 'none';
+            initGame();
+        });
+
+        document.getElementById('btn-mode-bot').addEventListener('click', () => {
+            let diffBox = document.getElementById('difficulty-container');
+            diffBox.style.display = diffBox.style.display === 'flex' ? 'none' : 'flex';
+        });
+
+        function startBotGame(level) {
+            gameMode = 'bot';
+            botDifficulty = level;
+            document.getElementById('p2-label').innerText = 'BOT';
+            document.getElementById('lobby-screen').style.display = 'none';
+            initGame();
+        }
+
         async function checkTurnPermission() {
+            if (gameMode === 'bot') return;
             try {
                 let response = await fetch(`${BACKEND_URL}/api/game-status/${chatId}`);
                 let data = await response.json();
@@ -341,6 +473,7 @@
         }
 
         function laporkanKeBot(eventType, ballNumber = null) {
+            if (gameMode === 'bot') return;
             fetch(`${BACKEND_URL}/api/game-event`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -356,8 +489,6 @@
                 }, 1500);
             });
         }
-
-        checkTurnPermission();
 
         const canvas = document.getElementById('pool-canvas');
         const ctx = canvas.getContext('2d');
@@ -444,7 +575,6 @@
         let choosingPocket = false;
         let selectedPocketId = null;
 
-        // Membuat pola tekstur laken kain biliar secara procedural agar realistis tanpa asset eksternal
         const feltPatternCanvas = document.createElement('canvas');
         const fCtx = feltPatternCanvas.getContext('2d');
         feltPatternCanvas.width = 60;
@@ -453,12 +583,6 @@
         fCtx.fillRect(0, 0, 60, 60);
         fCtx.fillStyle = 'rgba(0, 0, 0, 0.04)';
         for (let i = 0; i < 300; i++) {
-            let rx = Math.random() * 60;
-            let ry = Math.random() * 60;
-            fCtx.fillRect(rx, ry, 1, 1);
-        }
-        fCtx.fillStyle = 'rgba(255, 255, 255, 0.03)';
-        for (let i = 0; i < 200; i++) {
             let rx = Math.random() * 60;
             let ry = Math.random() * 60;
             fCtx.fillRect(rx, ry, 1, 1);
@@ -499,6 +623,7 @@
             gameOver = false;
             choosingPocket = false;
             selectedPocketId = null;
+            isBotThinking = false;
             topNotif.classList.remove('show');
 
             let allPoolBalls = [1, 2, 3, 4, 5, 6, 7, 9, 10, 11, 12, 13, 14, 15];
@@ -534,6 +659,10 @@
                     color: getBallColor(n)
                 });
             });
+
+            if (gameMode === 'pvp') {
+                checkTurnPermission();
+            }
         }
 
         function getBallColor(n) {
@@ -603,8 +732,85 @@
             return balls.every(b => !b.active || Math.hypot(b.vx, b.vy) < 0.035);
         }
 
+        // LOGIKA BOT DIPERKECIL JEDANYA AGAR EKSEKUSI CEPAT & RESPONSIF DI TELEGRAM
+        function runBotTurn() {
+            if (isBotThinking || gameOver) return;
+            isBotThinking = true;
+
+            setTimeout(() => {
+                let cue = balls.find(b => b.isCue && b.active);
+                if (!cue) { isBotThinking = false; return; }
+
+                if (cueBallInHand) {
+                    cue.x = TABLE_X + TABLE_W / 2;
+                    cue.y = TABLE_Y + TABLE_H / 2 - 50;
+                    cueBallInHand = false;
+                }
+
+                let botList = player2Balls;
+                let isBotBallsEmpty = botList.length === 0;
+
+                let availableBalls = balls.filter(b => b.active && !b.isCue && (
+                    (!isBotBallsEmpty && botList.includes(b.number)) ||
+                    (isBotBallsEmpty && b.number === 8)
+                ));
+
+                if (availableBalls.length === 0) availableBalls = balls.filter(b => b.active && !b.isCue);
+
+                // Algoritma peningkatan kecerdasan bot (AI) agar lebih akurat memilih sudut & lubang terdekat
+                let bestTarget = null;
+                let bestPocket = null;
+                let minScore = 99999;
+
+                availableBalls.forEach(ball => {
+                    pockets.forEach(pocket => {
+                        let distToPocket = Math.hypot(pocket.x - ball.x, pocket.y - ball.y);
+                        let distToCue = Math.hypot(ball.x - cue.x, ball.y - cue.y);
+                        let totalCost = distToPocket + distToCue * 0.4;
+                        if (totalCost < minScore) {
+                            minScore = totalCost;
+                            bestTarget = ball;
+                            bestPocket = pocket;
+                        }
+                    });
+                });
+
+                if (!bestTarget) bestTarget = availableBalls[0];
+                if (!bestPocket) bestPocket = pockets[0];
+
+                let angleToPocket = Math.atan2(bestPocket.y - bestTarget.y, bestPocket.x - bestTarget.x);
+                let aimX = bestTarget.x - Math.cos(angleToPocket) * (BALL_R * 2.02);
+                let aimY = bestTarget.y - Math.sin(angleToPocket) * (BALL_R * 2.02);
+                let finalAngle = Math.atan2(aimY - cue.y, aimX - cue.x);
+
+                let errorMargin = 0;
+                let powerVal = 10;
+
+                if (botDifficulty === 'easy') {
+                    errorMargin = (Math.random() - 0.5) * 0.25;
+                    powerVal = 8 + Math.random() * 4;
+                } else if (botDifficulty === 'medium') {
+                    errorMargin = (Math.random() - 0.5) * 0.08;
+                    powerVal = 10 + Math.random() * 3;
+                } else if (botDifficulty === 'hard') {
+                    errorMargin = (Math.random() - 0.5) * 0.015; // Jauh lebih akurat & pintar
+                    powerVal = 11 + Math.random() * 3;
+                }
+
+                finalAngle += errorMargin;
+
+                initAudio();
+                cue.vx = Math.cos(finalAngle) * powerVal;
+                cue.vy = Math.sin(finalAngle) * powerVal;
+                playSound('hit');
+                shotTaken = true;
+                ballsEnteredThisShot = [];
+                isBotThinking = false;
+            }, 350); // Jeda dipercepat drastis agar tidak terasa lambat di Telegram
+        }
+
         canvas.addEventListener('pointerdown', (e) => {
-            if (gameOver) return;
+            if (gameOver || (gameMode === 'bot' && currentTurn === 2)) return;
             let rect = canvas.getBoundingClientRect();
             let mx = e.clientX - rect.left;
             let my = e.clientY - rect.top;
@@ -646,7 +852,7 @@
         });
 
         canvas.addEventListener('pointermove', (e) => {
-            if (gameOver) return;
+            if (gameOver || (gameMode === 'bot' && currentTurn === 2)) return;
             let rect = canvas.getBoundingClientRect();
             let mx = e.clientX - rect.left;
             let my = e.clientY - rect.top;
@@ -679,7 +885,7 @@
         });
 
         shootBtn.addEventListener('click', () => {
-            if (gameOver || !areAllBallsStill()) return;
+            if (gameOver || !areAllBallsStill() || (gameMode === 'bot' && currentTurn === 2)) return;
 
             if (cueBallInHand) {
                 cueBallInHand = false;
@@ -724,7 +930,6 @@
         function loop() {
             ctx.clearRect(0, 0, LOGICAL_W, LOGICAL_H);
 
-            // Frame Kayu Meja Biliar dengan Efek 3D Bevel/Gradasi Mewah
             ctx.beginPath();
             ctx.roundRect(4, 4, LOGICAL_W - 8, LOGICAL_H - 8, 10);
             let outerWoodGrad = ctx.createLinearGradient(0, 0, LOGICAL_W, LOGICAL_H);
@@ -738,7 +943,6 @@
             ctx.stroke();
             ctx.closePath();
 
-            // Batas Rail / Bantalan Bantal Meja (Cushion Border)
             ctx.beginPath();
             ctx.rect(TABLE_X - 4, TABLE_Y - 4, TABLE_W + 8, TABLE_H + 8);
             ctx.fillStyle = '#0f5228';
@@ -748,11 +952,9 @@
             ctx.stroke();
             ctx.closePath();
 
-            // Kain Laken Meja (Menggunakan Pola Tekstur Kain Agar Realistis)
             ctx.fillStyle = feltPattern;
             ctx.fillRect(TABLE_X, TABLE_Y, TABLE_W, TABLE_H);
 
-            // Efek Shadow/Vignette Halus di Pinggir Kain (Memberikan Kesan Kedalaman / 3D)
             let cushionShadow = ctx.createRadialGradient(
                 TABLE_X + TABLE_W / 2, TABLE_Y + TABLE_H / 2, TABLE_W * 0.2,
                 TABLE_X + TABLE_W / 2, TABLE_Y + TABLE_H / 2, TABLE_W * 0.7
@@ -765,7 +967,6 @@
             let currentList = currentTurn === 1 ? player1Balls : player2Balls;
             let isMyBallsEmpty = currentList.length === 0;
 
-            // Render Lubang (Pockets) dengan efek kedalaman
             pockets.forEach(p => {
                 let isHighlighted = choosingPocket || (isMyBallsEmpty && selectedPocketId === p.id);
                 
@@ -786,7 +987,6 @@
                 ctx.fill();
                 ctx.closePath();
 
-                // Lingkaran bibir lubang besi/kulit
                 ctx.beginPath();
                 ctx.arc(p.x, p.y, POCKET_R, 0, Math.PI * 2);
                 ctx.lineWidth = 2.5;
@@ -904,15 +1104,15 @@
                     if (blackData) {
                         if (!myBallsEmptyNow) {
                             gameOver = true;
-                            showNotification("KAMU KALAH", "memasukkan bola 8 terlalu cepat");
+                            showNotification(currentTurn === 1 ? "KAMU KALAH" : "BOT KALAH", "memasukkan bola 8 terlalu cepat");
                             laporkanKeBot('foul');
                         } else if (myBallsEmptyNow && !hitFoulWhite && selectedPocketId !== null && blackData.pocketId === selectedPocketId) {
                             gameOver = true;
-                            showNotification("KAMU MENANG", "", true);
+                            showNotification(currentTurn === 1 ? "KAMU MENANG" : "BOT MENANG", "", true);
                             laporkanKeBot('win');
                         } else {
                             gameOver = true;
-                            showNotification("KAMU KALAH", "salah lubang / foul saat memasukkan bola 8");
+                            showNotification(currentTurn === 1 ? "KAMU KALAH" : "BOT KALAH", "salah lubang / foul saat memasukkan bola 8");
                             laporkanKeBot('foul');
                         }
                     } else if (hitFoulWhite) {
@@ -933,12 +1133,16 @@
                 }
             }
 
+            if (gameMode === 'bot' && currentTurn === 2 && ballsStill && !gameOver && !shotTaken) {
+                runBotTurn();
+            }
+
             let cue = balls.find(b => b.isCue && b.active);
             let targetBall = null;
 
             document.querySelectorAll('.hud-ball').forEach(el => el.classList.remove('highlight-hud'));
 
-            if (cue && ballsStill && !cueBallInHand && !gameOver && !choosingPocket && !(isMyBallsEmpty && selectedPocketId === null)) {
+            if (cue && ballsStill && !cueBallInHand && !gameOver && !choosingPocket && !(isMyBallsEmpty && selectedPocketId === null) && !(gameMode === 'bot' && currentTurn === 2)) {
                 let minDist = 999;
                 let hitPoint = {x: 0, y: 0};
 
@@ -1039,7 +1243,6 @@
                     ctx.closePath();
                 }
 
-                // Bayangan bola di atas meja
                 ctx.beginPath();
                 ctx.arc(b.x + 1.2, b.y + 1.8, BALL_R, 0, Math.PI * 2);
                 ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
@@ -1097,7 +1300,6 @@
             return "#" + (0x1000000 + (R<255?R<0?0:R:255)*0x10000 + (G<255?G<0?0:G:255)*0x100 + (B<255?B<0?0:B:255)).toString(16).slice(1);
         }
 
-        initGame();
         loop();
     </script>
 </body>
