@@ -1,0 +1,1105 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>8 Ball Pool Pro - HD Realistic</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+        body, html {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: #090e17;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .game-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
+            width: 100%;
+            max-width: 440px;
+            height: 100dvh;
+            background: #0d1626;
+            position: relative;
+            padding: 4px;
+        }
+
+        .top-notification {
+            width: 85%;
+            max-width: 290px;
+            background: rgba(20, 10, 10, 0.95);
+            border: 2px solid #ff3333;
+            border-radius: 10px;
+            padding: 12px 14px;
+            text-align: center;
+            box-shadow: 0 0 20px rgba(255, 51, 51, 0.6);
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 100;
+        }
+        .top-notification.win-mode {
+            background: rgba(10, 20, 15, 0.95);
+            border-color: #00ff88;
+            box-shadow: 0 0 20px rgba(0, 255, 136, 0.5);
+        }
+        .top-notification.show { display: block; }
+        .notif-title { font-size: 15px; font-weight: 900; color: #ff3333; letter-spacing: 1px; }
+        .top-notification.win-mode .notif-title { color: #00ff88; }
+        .notif-sub { font-size: 10px; font-weight: 700; color: #fff; margin-top: 4px; display: none; }
+
+        .top-players-hud {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            width: 100%;
+            max-width: 410px;
+            background: rgba(18, 28, 45, 0.95);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 4px 8px;
+            gap: 4px;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.5);
+            flex-shrink: 0;
+            margin-top: 2px;
+        }
+
+        .player-side-group {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            opacity: 0.45;
+            transition: all 0.2s ease;
+            flex: 1;
+            min-width: 0;
+        }
+        .player-side-group.active-turn { opacity: 1; }
+        .player-side-group.p2-side { justify-content: flex-end; }
+
+        .avatar-box {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            flex-shrink: 0;
+        }
+
+        .score-text {
+            font-size: 7px;
+            font-weight: 800;
+            color: #00bfff;
+        }
+
+        .avatar {
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            background: #1e3254;
+            border: 1.2px solid #3a5c94;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 10px;
+        }
+        .player-side-group.active-turn .avatar {
+            border-color: #00ff88;
+            box-shadow: 0 0 6px #00ff88;
+        }
+
+        .ball-slot-horizontal {
+            display: flex;
+            gap: 3px;
+            align-items: center;
+            flex-wrap: nowrap;
+            overflow: hidden;
+            min-height: 18px;
+            flex-grow: 1;
+        }
+        .player-side-group.p2-side .ball-slot-horizontal { justify-content: flex-end; }
+
+        .vs-text {
+            font-size: 9px;
+            font-weight: 900;
+            color: #f1c40f;
+            padding: 0 2px;
+            letter-spacing: 1px;
+            flex-shrink: 0;
+        }
+
+        .hud-ball {
+            width: 15px;
+            height: 15px;
+            border-radius: 50%;
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            box-shadow: inset -2px -2px 4px rgba(0,0,0,0.7), 0 2px 4px rgba(0,0,0,0.5);
+            flex-shrink: 0;
+            border: 0.5px solid rgba(0,0,0,0.5);
+        }
+        .hud-ball::before {
+            content: '';
+            position: absolute;
+            top: 2px;
+            left: 3px;
+            width: 4px;
+            height: 2.5px;
+            background: rgba(255, 255, 255, 0.7);
+            border-radius: 50%;
+            transform: rotate(-30deg);
+        }
+        .hud-number-circle {
+            width: 7.5px;
+            height: 7.5px;
+            background: #ffffff;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            box-shadow: 0 0 1px rgba(0,0,0,0.5);
+        }
+        .hud-number-text {
+            font-size: 5px;
+            font-weight: 900;
+            color: #111111;
+            line-height: 1;
+        }
+
+        .highlight-hud {
+            box-shadow: 0 0 8px #00ff88, inset -2px -2px 4px rgba(0,0,0,0.7) !important;
+            transform: scale(1.15);
+            transition: transform 0.15s ease;
+        }
+
+        .board-layout {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            flex-grow: 1;
+            margin: 2px 0;
+            overflow: hidden;
+        }
+
+        #pool-canvas {
+            background: transparent;
+            border-radius: 6px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.8);
+            cursor: crosshair;
+            touch-action: none;
+        }
+
+        .bottom-controls {
+            width: 100%;
+            max-width: 410px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: rgba(18, 28, 45, 0.9);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 10px;
+            padding: 5px 10px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+            flex-shrink: 0;
+            margin-bottom: 2px;
+        }
+
+        .power-wrapper-horizontal {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex-grow: 1;
+            margin-right: 8px;
+        }
+
+        .power-slider-h {
+            width: 100%;
+            height: 7px;
+            accent-color: #00bfff;
+            cursor: pointer;
+        }
+
+        .power-label {
+            font-size: 8px;
+            font-weight: 700;
+            color: #00bfff;
+            min-width: 24px;
+            text-align: right;
+        }
+
+        .control-btn {
+            height: 28px;
+            padding: 0 14px;
+            background: #00bfff;
+            border: none;
+            border-radius: 6px;
+            color: #0d1626;
+            font-size: 9px;
+            font-weight: 900;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .control-btn:active { transform: scale(0.94); background: #009acc; }
+        .control-btn.place-btn { background: #00ff88; }
+        .control-btn.place-btn:active { background: #00cc6a; }
+    </style>
+</head>
+<body>
+
+    <div class="game-container">
+        <div id="top-notif" class="top-notification">
+            <div id="notif-title" class="notif-title">MISSED</div>
+            <div id="notif-sub" class="notif-sub">Tidak ada bola masuk</div>
+        </div>
+
+        <div class="top-players-hud">
+            <div id="p1-side" class="player-side-group active-turn">
+                <div class="avatar-box">
+                    <div class="score-text">P1</div>
+                    <div class="avatar">👤</div>
+                </div>
+                <div id="p1-balls" class="ball-slot-horizontal"></div>
+            </div>
+
+            <div class="vs-text">VS</div>
+
+            <div id="p2-side" class="player-side-group p2-side">
+                <div id="p2-balls" class="ball-slot-horizontal"></div>
+                <div class="avatar-box">
+                    <div class="score-text">P2</div>
+                    <div class="avatar">👤</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="board-layout">
+            <canvas id="pool-canvas"></canvas>
+        </div>
+
+        <div class="bottom-controls">
+            <div id="power-control-wrap" class="power-wrapper-horizontal">
+                <span style="font-size: 8px; color:#aaa; font-weight:700;">PWR</span>
+                <input type="range" id="power-slider" class="power-slider-h" min="1" max="100" value="50">
+                <span id="power-text" class="power-label">50%</span>
+            </div>
+            <button class="control-btn" id="shoot-btn">TEMBAK</button>
+        </div>
+    </div>
+
+    <script>
+        let tg = window.Telegram?.WebApp;
+        if (tg) {
+            tg.ready();
+            tg.expand();
+        }
+
+        // KONFIGURASI BACKEND SERVER (Ubah URL ini sesuai tempat hosting Express.js kamu)
+        const BACKEND_URL = 'https://link-server-kamu.com'; 
+        const urlParams = new URLSearchParams(window.location.search);
+        const chatId = urlParams.get('chat_id') || '12345678';
+        const currentUserId = tg?.initDataUnsafe?.user?.id || 0;
+
+        async function checkTurnPermission() {
+            try {
+                let response = await fetch(`${BACKEND_URL}/api/game-status/${chatId}`);
+                let data = await response.json();
+                if (data.activePlayerId && data.activePlayerId !== currentUserId) {
+                    tampilkanBukanGiliran();
+                }
+            } catch (e) {
+                console.log("Gagal mengecek status server");
+            }
+        }
+
+        function tampilkanBukanGiliran() {
+            let overlay = document.createElement('div');
+            overlay.style.cssText = "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.9);z-index:9999;display:flex;flex-direction:column;justify-content:center;align-items:center;color:#ff3333;font-weight:900;font-size:20px;text-align:center;padding:20px;";
+            overlay.innerHTML = `⚠️ BUKAN GILIRANMU!<br><span style="font-size:12px;color:#fff;margin-top:10px;font-weight:normal;">Tunggu giliran lawan selesai bermain.</span>`;
+            document.body.appendChild(overlay);
+            setTimeout(() => {
+                if (tg && tg.close) tg.close();
+            }, 2000);
+        }
+
+        function laporkanKeBot(eventType, ballNumber = null) {
+            fetch(`${BACKEND_URL}/api/game-event`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    chatId: chatId,
+                    eventType: eventType,
+                    data: { ballNumber: ballNumber }
+                })
+            }).then(() => {
+                setTimeout(() => {
+                    if (tg && tg.close) tg.close();
+                }, 1000);
+            });
+        }
+
+        checkTurnPermission();
+
+        const canvas = document.getElementById('pool-canvas');
+        const ctx = canvas.getContext('2d');
+        const powerSlider = document.getElementById('power-slider');
+        const powerText = document.getElementById('power-text');
+        const shootBtn = document.getElementById('shoot-btn');
+        const p1SideEl = document.getElementById('p1-side');
+        const p2SideEl = document.getElementById('p2-side');
+        const p1BallsContainer = document.getElementById('p1-balls');
+        const p2BallsContainer = document.getElementById('p2-balls');
+        const topNotif = document.getElementById('top-notif');
+        const notifTitle = document.getElementById('notif-title');
+        const notifSub = document.getElementById('notif-sub');
+
+        const LOGICAL_W = 280;
+        const LOGICAL_H = 480;
+        const dpr = window.devicePixelRatio || 1;
+
+        canvas.width = LOGICAL_W * dpr;
+        canvas.height = LOGICAL_H * dpr;
+        ctx.scale(dpr, dpr);
+        canvas.style.width = LOGICAL_W + 'px';
+        canvas.style.height = LOGICAL_H + 'px';
+
+        let audioCtx = null;
+        function initAudio() {
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+
+        function playSound(type) {
+            initAudio();
+            if (!audioCtx) return;
+            let osc = audioCtx.createOscillator();
+            let gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            let now = audioCtx.currentTime;
+
+            if (type === 'hit') {
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(400, now);
+                osc.frequency.linearRampToValueAtTime(70, now + 0.08);
+                gain.gain.setValueAtTime(0.3, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.08);
+                osc.start(now); osc.stop(now + 0.08);
+            } else if (type === 'pocket') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(140, now);
+                gain.gain.setValueAtTime(0.5, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
+                osc.start(now); osc.stop(now + 0.25);
+            }
+        }
+
+        const TABLE_X = 20; 
+        const TABLE_Y = 20;
+        const TABLE_W = LOGICAL_W - (TABLE_X * 2);
+        const TABLE_H = LOGICAL_H - (TABLE_Y * 2);
+        
+        const BALL_R = 7.5;
+        const POCKET_R = 14.5;
+
+        const pockets = [
+            {id: 0, x: TABLE_X, y: TABLE_Y},                                  
+            {id: 1, x: TABLE_X + TABLE_W, y: TABLE_Y},                        
+            {id: 2, x: TABLE_X, y: TABLE_Y + TABLE_H / 2},                    
+            {id: 3, x: TABLE_X + TABLE_W, y: TABLE_Y + TABLE_H / 2},          
+            {id: 4, x: TABLE_X, y: TABLE_Y + TABLE_H},                        
+            {id: 5, x: TABLE_X + TABLE_W, y: TABLE_Y + TABLE_H}               
+        ];
+
+        let balls = [];
+        let aimAngle = -Math.PI / 2;
+        let isAiming = false;
+        let currentTurn = 1; 
+        let shotTaken = false;
+        let ballsEnteredThisShot = [];
+        let cueBallInHand = false;
+        let gameOver = false;
+
+        let player1Balls = [];
+        let player2Balls = [];
+
+        let choosingPocket = false;
+        let selectedPocketId = null;
+
+        powerSlider.addEventListener('input', () => {
+            powerText.innerText = powerSlider.value + '%';
+        });
+
+        function showNotification(title, sub = "", isWin = false) {
+            notifTitle.innerText = title;
+            notifSub.innerText = sub;
+            if (sub === "") {
+                notifSub.style.display = "none";
+            } else {
+                notifSub.style.display = "block";
+            }
+
+            if (isWin) {
+                topNotif.classList.add('win-mode');
+            } else {
+                topNotif.classList.remove('win-mode');
+            }
+
+            topNotif.classList.add('show');
+            setTimeout(() => {
+                if (!gameOver) topNotif.classList.remove('show');
+            }, 1400);
+        }
+
+        function initGame() {
+            balls = [];
+            currentTurn = 1;
+            shotTaken = false;
+            ballsEnteredThisShot = [];
+            cueBallInHand = false;
+            gameOver = false;
+            choosingPocket = false;
+            selectedPocketId = null;
+            topNotif.classList.remove('show');
+
+            let allPoolBalls = [1, 2, 3, 4, 5, 6, 7, 9, 10, 11, 12, 13, 14, 15];
+            allPoolBalls.sort(() => Math.random() - 0.5);
+
+            player1Balls = allPoolBalls.slice(0, 7);
+            player2Balls = allPoolBalls.slice(7, 14);
+
+            updateTurnUI();
+            renderHUDUI();
+            updateButtonState();
+
+            const centerX = TABLE_X + TABLE_W / 2;
+            balls.push({ x: centerX, y: TABLE_Y + TABLE_H - 70, vx: 0, vy: 0, color: '#ffffff', number: 0, active: true, isCue: true });
+
+            const rackY = TABLE_Y + 110;
+            const rackPositions = [
+                {x: centerX, y: rackY},
+                {x: centerX - 8, y: rackY + 14}, {x: centerX + 8, y: rackY + 14},
+                {x: centerX - 16, y: rackY + 28}, {x: centerX, y: rackY + 28}, {x: centerX + 16, y: rackY + 28},
+                {x: centerX - 24, y: rackY + 42}, {x: centerX - 8, y: rackY + 42}, {x: centerX + 8, y: rackY + 42}, {x: centerX + 24, y: rackY + 42},
+                {x: centerX - 32, y: rackY + 56}, {x: centerX - 16, y: rackY + 56}, {x: centerX, y: rackY + 56}, {x: centerX + 16, y: rackY + 56}, {x: centerX + 32, y: rackY + 56}
+            ];
+
+            let numbers = [...player1Balls, 8, ...player2Balls];
+            numbers.sort(() => Math.random() - 0.5);
+
+            rackPositions.forEach((pos, index) => {
+                let n = numbers[index];
+                balls.push({
+                    x: pos.x, y: pos.y, vx: 0, vy: 0,
+                    number: n, active: true, isCue: false,
+                    color: getBallColor(n)
+                });
+            });
+        }
+
+        function getBallColor(n) {
+            const colors = ['#f1c40f', '#2980b9', '#e74c3c', '#8e44ad', '#e67e22', '#27ae60', '#78281f', '#222222', '#f1c40f', '#2980b9', '#e74c3c', '#8e44ad', '#e67e22', '#27ae60', '#78281f'];
+            return colors[n - 1];
+        }
+
+        function renderHUDUI() {
+            p1BallsContainer.innerHTML = '';
+            player1Balls.forEach(n => {
+                let div = document.createElement('div');
+                div.className = 'hud-ball';
+                div.style.background = getBallColor(n);
+                div.id = `hud-ball-${n}`;
+                let circle = document.createElement('div');
+                circle.className = 'hud-number-circle';
+                let text = document.createElement('span');
+                text.className = 'hud-number-text';
+                text.innerText = n;
+                circle.appendChild(text);
+                div.appendChild(circle);
+                p1BallsContainer.appendChild(div);
+            });
+
+            p2BallsContainer.innerHTML = '';
+            player2Balls.forEach(n => {
+                let div = document.createElement('div');
+                div.className = 'hud-ball';
+                div.style.background = getBallColor(n);
+                div.id = `hud-ball-${n}`;
+                let circle = document.createElement('div');
+                circle.className = 'hud-number-circle';
+                let text = document.createElement('span');
+                text.className = 'hud-number-text';
+                text.innerText = n;
+                circle.appendChild(text);
+                div.appendChild(circle);
+                p2BallsContainer.appendChild(div);
+            });
+        }
+
+        function updateTurnUI() {
+            if (gameOver) return;
+            if (currentTurn === 1) {
+                p1SideEl.classList.add('active-turn');
+                p2SideEl.classList.remove('active-turn');
+            } else {
+                p2SideEl.classList.add('active-turn');
+                p1SideEl.classList.remove('active-turn');
+            }
+        }
+
+        function updateButtonState() {
+            if (cueBallInHand) {
+                shootBtn.innerText = "LETAKAN";
+                shootBtn.className = "control-btn place-btn";
+            } else if (choosingPocket) {
+                shootBtn.innerText = "PILIH TARGET";
+                shootBtn.className = "control-btn";
+            } else {
+                shootBtn.innerText = "TEMBAK";
+                shootBtn.className = "control-btn";
+            }
+        }
+
+        function areAllBallsStill() {
+            return balls.every(b => !b.active || Math.hypot(b.vx, b.vy) < 0.035);
+        }
+
+        canvas.addEventListener('pointerdown', (e) => {
+            if (gameOver) return;
+            let rect = canvas.getBoundingClientRect();
+            let mx = e.clientX - rect.left;
+            let my = e.clientY - rect.top;
+
+            let currentList = currentTurn === 1 ? player1Balls : player2Balls;
+            let isMyBallsEmpty = currentList.length === 0;
+
+            if (ballsStill() && isMyBallsEmpty && choosingPocket) {
+                let clickedPocket = pockets.find(p => Math.hypot(mx - p.x, my - p.y) < POCKET_R + 6);
+                if (clickedPocket) {
+                    selectedPocketId = clickedPocket.id;
+                    choosingPocket = false;
+                    updateButtonState();
+                }
+                return;
+            }
+
+            if (!areAllBallsStill()) return;
+
+            let cue = balls.find(b => b.isCue && b.active);
+            if (cueBallInHand && cue) {
+                if (mx >= TABLE_X + BALL_R && mx <= TABLE_X + TABLE_W - BALL_R &&
+                    my >= TABLE_Y + BALL_R && my <= TABLE_Y + TABLE_H - BALL_R) {
+                    cue.x = mx;
+                    cue.y = my;
+                }
+                return;
+            }
+
+            if (isMyBallsEmpty && selectedPocketId === null && !choosingPocket) {
+                choosingPocket = true;
+                showNotification("PILIH TARGET");
+                updateButtonState();
+                return;
+            }
+
+            isAiming = true;
+            updateAim(e);
+        });
+
+        canvas.addEventListener('pointermove', (e) => {
+            if (gameOver) return;
+            let rect = canvas.getBoundingClientRect();
+            let mx = e.clientX - rect.left;
+            let my = e.clientY - rect.top;
+            let cue = balls.find(b => b.isCue && b.active);
+
+            if (cueBallInHand && cue && e.buttons === 1) {
+                if (mx >= TABLE_X + BALL_R && mx <= TABLE_X + TABLE_W - BALL_R &&
+                    my >= TABLE_Y + BALL_R && my <= TABLE_Y + TABLE_H - BALL_R) {
+                    cue.x = mx;
+                    cue.y = my;
+                }
+                return;
+            }
+
+            let currentList = currentTurn === 1 ? player1Balls : player2Balls;
+            let isMyBallsEmpty = currentList.length === 0;
+
+            if (isMyBallsEmpty && selectedPocketId === null) {
+                isAiming = false;
+                return;
+            }
+
+            if (isAiming && !cueBallInHand && !choosingPocket) {
+                updateAim(e);
+            }
+        });
+
+        window.addEventListener('pointerup', () => {
+            isAiming = false;
+        });
+
+        shootBtn.addEventListener('click', () => {
+            if (gameOver || !areAllBallsStill()) return;
+
+            if (cueBallInHand) {
+                cueBallInHand = false;
+                updateTurnUI();
+                updateButtonState();
+                return;
+            }
+
+            let currentList = currentTurn === 1 ? player1Balls : player2Balls;
+            let isMyBallsEmpty = currentList.length === 0;
+
+            if (isMyBallsEmpty && selectedPocketId === null && !choosingPocket) {
+                choosingPocket = true;
+                showNotification("PILIH TARGET");
+                updateButtonState();
+                return;
+            }
+
+            initAudio();
+            let cue = balls.find(b => b.isCue && b.active);
+            if (!cue) return;
+
+            let powerVal = (parseInt(powerSlider.value) / 100) * 16;
+            cue.vx = Math.cos(aimAngle) * powerVal;
+            cue.vy = Math.sin(aimAngle) * powerVal;
+            playSound('hit');
+            shotTaken = true;
+            ballsEnteredThisShot = [];
+        });
+
+        function updateAim(e) {
+            let rect = canvas.getBoundingClientRect();
+            let mx = e.clientX - rect.left;
+            let my = e.clientY - rect.top;
+            let cue = balls.find(b => b.isCue && b.active);
+            if (!cue) return;
+            aimAngle = Math.atan2(my - cue.y, mx - cue.x);
+        }
+
+        function ballsStill() {
+            return areAllBallsStill();
+        }
+
+        let wasMoving = false;
+
+        function loop() {
+            ctx.clearRect(0, 0, LOGICAL_W, LOGICAL_H);
+
+            ctx.beginPath();
+            ctx.roundRect(4, 4, LOGICAL_W - 8, LOGICAL_H - 8, 10);
+            let outerWoodGrad = ctx.createLinearGradient(0, 0, LOGICAL_W, LOGICAL_H);
+            outerWoodGrad.addColorStop(0, '#592c10');
+            outerWoodGrad.addColorStop(0.5, '#3a1a08');
+            outerWoodGrad.addColorStop(1, '#200e04');
+            ctx.fillStyle = outerWoodGrad;
+            ctx.fill();
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = '#150802';
+            ctx.stroke();
+            ctx.closePath();
+
+            ctx.beginPath();
+            ctx.rect(TABLE_X - 4, TABLE_Y - 4, TABLE_W + 8, TABLE_H + 8);
+            ctx.fillStyle = '#0e4a23';
+            ctx.fill();
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = '#093318';
+            ctx.stroke();
+            ctx.closePath();
+
+            ctx.fillStyle = '#125c2d';
+            ctx.fillRect(TABLE_X, TABLE_Y, TABLE_W, TABLE_H);
+
+            let lightGrad = ctx.createRadialGradient(
+                TABLE_X + TABLE_W / 2, TABLE_Y + TABLE_H / 2, 30,
+                TABLE_X + TABLE_W / 2, TABLE_Y + TABLE_H / 2, TABLE_W * 0.75
+            );
+            lightGrad.addColorStop(0, 'rgba(255, 255, 255, 0.15)');
+            lightGrad.addColorStop(0.6, 'rgba(0, 0, 0, 0.1)');
+            lightGrad.addColorStop(1, 'rgba(0, 0, 0, 0.65)');
+            
+            ctx.fillStyle = lightGrad;
+            ctx.fillRect(TABLE_X, TABLE_Y, TABLE_W, TABLE_H);
+
+            let currentList = currentTurn === 1 ? player1Balls : player2Balls;
+            let isMyBallsEmpty = currentList.length === 0;
+
+            pockets.forEach(p => {
+                let isHighlighted = choosingPocket || (isMyBallsEmpty && selectedPocketId === p.id);
+                
+                if (isHighlighted) {
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, POCKET_R + 4, 0, Math.PI * 2);
+                    ctx.fillStyle = choosingPocket ? 'rgba(0, 255, 136, 0.4)' : 'rgba(255, 215, 0, 0.6)';
+                    ctx.fill();
+                    ctx.lineWidth = 2;
+                    ctx.strokeStyle = choosingPocket ? '#00ff88' : '#ffd700';
+                    ctx.stroke();
+                    ctx.closePath();
+                }
+
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, POCKET_R, 0, Math.PI * 2);
+                ctx.fillStyle = '#020305';
+                ctx.fill();
+                ctx.closePath();
+
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, POCKET_R, 0, Math.PI * 2);
+                ctx.lineWidth = 2;
+                ctx.strokeStyle = '#1a2634';
+                ctx.stroke();
+                ctx.closePath();
+            });
+
+            const substeps = 16;
+            for (let step = 0; step < substeps; step++) {
+                balls.forEach(b => {
+                    if (!b.active) return;
+                    
+                    let pocketHit = null;
+                    pockets.forEach(p => {
+                        if (Math.hypot(b.x - p.x, b.y - p.y) < POCKET_R) {
+                            pocketHit = p;
+                        }
+                    });
+
+                    if (pocketHit) {
+                        b.active = false;
+                        b.vx = 0;
+                        b.vy = 0;
+                        playSound('pocket');
+                        if (b.isCue) {
+                            cueBallInHand = true;
+                            showNotification("FOUL");
+                            updateButtonState();
+                            setTimeout(() => {
+                                b.x = TABLE_X + TABLE_W / 2; b.y = TABLE_Y + TABLE_H - 70; b.vx = 0; b.vy = 0; b.active = true;
+                            }, 50);
+                        } else {
+                            if (!ballsEnteredThisShot.some(item => item.number === b.number && item.pocketId === pocketHit.id)) {
+                                ballsEnteredThisShot.push({number: b.number, pocketId: pocketHit.id});
+                            }
+                        }
+                        return;
+                    }
+
+                    b.x += b.vx / substeps;
+                    b.y += b.vy / substeps;
+                    
+                    b.vx *= Math.pow(0.99, 1 / substeps);
+                    b.vy *= Math.pow(0.99, 1 / substeps);
+
+                    if (Math.hypot(b.vx, b.vy) < 0.02) { b.vx = 0; b.vy = 0; }
+
+                    const restitution = 0.76;
+                    if (b.x - BALL_R <= TABLE_X) { b.x = TABLE_X + BALL_R; b.vx *= -restitution; playSound('hit'); }
+                    if (b.x + BALL_R >= TABLE_X + TABLE_W) { b.x = TABLE_X + TABLE_W - BALL_R; b.vx *= -restitution; playSound('hit'); }
+                    if (b.y - BALL_R <= TABLE_Y) { b.y = TABLE_Y + BALL_R; b.vy *= -restitution; playSound('hit'); }
+                    if (b.y + BALL_R >= TABLE_Y + TABLE_H) { b.y = TABLE_Y + TABLE_H - BALL_R; b.vy *= -restitution; playSound('hit'); }
+                });
+
+                for (let i = 0; i < balls.length; i++) {
+                    for (let j = i + 1; j < balls.length; j++) {
+                        let b1 = balls[i], b2 = balls[j];
+                        if (!b1.active || !b2.active) continue;
+                        let dx = b2.x - b1.x, dy = b2.y - b1.y, dist = Math.hypot(dx, dy);
+                        if (dist < BALL_R * 2) {
+                            let nx = dx / dist, ny = dy / dist;
+                            let kx = b1.vx - b2.vx, ky = b1.vy - b2.vy;
+                            let p = 2 * (nx * kx + ny * ky) / 2.0;
+                            b1.vx -= p * nx * 0.98; b1.vy -= p * ny * 0.98;
+                            b2.vx += p * nx * 0.98; b2.vy += p * ny * 0.98;
+                            let overlap = (BALL_R * 2 - dist) / 2;
+                            b1.x -= overlap * nx; b1.y -= overlap * ny;
+                            b2.x += overlap * nx; b2.y += overlap * ny;
+                            if (Math.hypot(b1.vx - b2.vx, b1.vy - b2.vy) > 0.2) playSound('hit');
+                        }
+                    }
+                }
+            }
+
+            let ballsStill = areAllBallsStill();
+
+            if (!ballsStill) {
+                wasMoving = true;
+            } else if (wasMoving && ballsStill) {
+                wasMoving = false;
+                if (shotTaken && !gameOver) {
+                    shotTaken = false;
+
+                    let hitFoulWhite = cueBallInHand;
+                    let blackData = ballsEnteredThisShot.find(item => item.number === 8);
+                    let colorBallsPocketedData = ballsEnteredThisShot.filter(item => item.number >= 1 && item.number <= 15 && item.number !== 8);
+                    let colorBallsPocketed = colorBallsPocketedData.map(item => item.number);
+
+                    let curList = currentTurn === 1 ? player1Balls : player2Balls;
+                    let oppList = currentTurn === 1 ? player2Balls : player1Balls;
+                    let myBallsEmptyNow = curList.length === 0;
+
+                    let validPocketed = [];
+                    let invalidPocketed = [];
+
+                    validPocketed = colorBallsPocketed.filter(n => curList.includes(n));
+                    invalidPocketed = colorBallsPocketed.filter(n => oppList.includes(n));
+
+                    validPocketed.forEach(n => {
+                        let idx = curList.indexOf(n);
+                        if (idx > -1) {
+                            curList.splice(idx, 1);
+                            laporkanKeBot('goal', n);
+                        }
+                    });
+
+                    invalidPocketed.forEach(n => {
+                        let idx = oppList.indexOf(n);
+                        if (idx > -1) oppList.splice(idx, 1);
+                    });
+
+                    renderHUDUI();
+
+                    if (blackData) {
+                        if (!myBallsEmptyNow) {
+                            gameOver = true;
+                            showNotification("KAMU KALAH", "memasukkan bola 8 terlalu cepat");
+                            laporkanKeBot('foul');
+                        } else if (myBallsEmptyNow && !hitFoulWhite && selectedPocketId !== null && blackData.pocketId === selectedPocketId) {
+                            gameOver = true;
+                            showNotification("KAMU MENANG", "", true);
+                            laporkanKeBot('win');
+                        } else {
+                            gameOver = true;
+                            showNotification("KAMU KALAH", "salah lubang / foul saat memasukkan bola 8");
+                            laporkanKeBot('foul');
+                        }
+                    } else if (hitFoulWhite) {
+                        currentTurn = currentTurn === 1 ? 2 : 1;
+                        selectedPocketId = null;
+                        laporkanKeBot('foul');
+                    } else if (validPocketed.length > 0 && invalidPocketed.length === 0) {
+                        selectedPocketId = null;
+                    } else {
+                        currentTurn = currentTurn === 1 ? 2 : 1;
+                        selectedPocketId = null;
+                        showNotification("MISSED");
+                        laporkanKeBot('miss');
+                    }
+
+                    updateTurnUI();
+                    updateButtonState();
+                }
+            }
+
+            let cue = balls.find(b => b.isCue && b.active);
+            let targetBall = null;
+
+            document.querySelectorAll('.hud-ball').forEach(el => el.classList.remove('highlight-hud'));
+
+            if (cue && ballsStill && !cueBallInHand && !gameOver && !choosingPocket && !(isMyBallsEmpty && selectedPocketId === null)) {
+                let minDist = 999;
+                let hitPoint = {x: 0, y: 0};
+
+                balls.forEach(b => {
+                    if (!b.active || b.isCue) return;
+                    let toBallX = b.x - cue.x;
+                    let toBallY = b.y - cue.y;
+                    let proj = toBallX * Math.cos(aimAngle) + toBallY * Math.sin(aimAngle);
+                    if (proj > 0) {
+                        let cx = cue.x + Math.cos(aimAngle) * proj;
+                        let cy = cue.y + Math.sin(aimAngle) * proj;
+                        let d = Math.hypot(b.x - cx, b.y - cy);
+                        if (d < BALL_R * 2 && proj < minDist) {
+                            minDist = proj;
+                            targetBall = b;
+                            let backDist = Math.sqrt(Math.max(0, (BALL_R * 2) ** 2 - d ** 2));
+                            hitPoint.x = cue.x + Math.cos(aimAngle) * (proj - backDist);
+                            hitPoint.y = cue.y + Math.sin(aimAngle) * (proj - backDist);
+                        }
+                    }
+                });
+
+                let isTargetAllowed = targetBall && (
+                    (!isMyBallsEmpty && currentList.includes(targetBall.number)) ||
+                    (isMyBallsEmpty && targetBall.number === 8)
+                );
+
+                let maxRayLen = 350;
+                if (targetBall) {
+                    maxRayLen = Math.hypot(hitPoint.x - cue.x, hitPoint.y - cue.y);
+                }
+
+                ctx.beginPath();
+                ctx.moveTo(cue.x, cue.y);
+                ctx.lineTo(cue.x + Math.cos(aimAngle) * maxRayLen, cue.y + Math.sin(aimAngle) * maxRayLen);
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
+                ctx.lineWidth = 1.2;
+                ctx.setLineDash([4, 4]);
+                ctx.stroke();
+                ctx.setLineDash([]);
+                ctx.closePath();
+
+                if (targetBall && isTargetAllowed) {
+                    let hudEl = null;
+                    if (targetBall.number === 8) {
+                        let activeSide = currentTurn === 1 ? p1BallsContainer : p2BallsContainer;
+                        activeSide.style.boxShadow = '0 0 10px #00ff88';
+                    } else {
+                        hudEl = document.getElementById(`hud-ball-${targetBall.number}`);
+                        if (hudEl) hudEl.classList.add('highlight-hud');
+                    }
+
+                    ctx.beginPath();
+                    ctx.arc(targetBall.x, targetBall.y, BALL_R + 3.5, 0, Math.PI * 2);
+                    ctx.fillStyle = 'rgba(0, 191, 255, 0.35)';
+                    ctx.fill();
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeStyle = '#00bfff';
+                    ctx.stroke();
+                    ctx.closePath();
+
+                    ctx.beginPath();
+                    ctx.arc(hitPoint.x, hitPoint.y, BALL_R, 0, Math.PI * 2);
+                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+                    ctx.lineWidth = 1;
+                    ctx.setLineDash([2, 2]);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                    ctx.closePath();
+
+                    let targetAngle = Math.atan2(targetBall.y - hitPoint.y, targetBall.x - hitPoint.x);
+                    ctx.beginPath();
+                    ctx.moveTo(targetBall.x, targetBall.y);
+                    ctx.lineTo(targetBall.x + Math.cos(targetAngle) * 70, targetBall.y + Math.sin(targetAngle) * 70);
+                    ctx.strokeStyle = '#00e1ff';
+                    ctx.lineWidth = 1.5;
+                    ctx.setLineDash([3, 3]);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                    ctx.closePath();
+                } else {
+                    p1BallsContainer.style.boxShadow = 'none';
+                    p2BallsContainer.style.boxShadow = 'none';
+                }
+
+                let powerOffset = (parseInt(powerSlider.value) / 100) * 35; 
+                let cueDistFromBall = 16 + powerOffset; 
+                let cueLength = 220;
+                
+                let startX = cue.x - Math.cos(aimAngle) * (BALL_R + cueDistFromBall);
+                let startY = cue.y - Math.sin(aimAngle) * (BALL_R + cueDistFromBall);
+                let endX = startX - Math.cos(aimAngle) * cueLength;
+                let endY = startY - Math.sin(aimAngle) * cueLength;
+
+                ctx.save();
+                let cueGrad = ctx.createLinearGradient(startX, startY, endX, endY);
+                cueGrad.addColorStop(0, '#ffffff');
+                cueGrad.addColorStop(0.04, '#e0d0c0');
+                cueGrad.addColorStop(0.08, '#d4a373');
+                cueGrad.addColorStop(0.35, '#8c5830');
+                cueGrad.addColorStop(0.65, '#5c3516');
+                cueGrad.addColorStop(0.95, '#1f1005');
+                cueGrad.addColorStop(1, '#0d0602');
+
+                ctx.beginPath();
+                ctx.moveTo(startX + Math.sin(aimAngle) * 1.8, startY - Math.cos(aimAngle) * 1.8);
+                ctx.lineTo(endX + Math.sin(aimAngle) * 4.5, endY - Math.cos(aimAngle) * 4.5);
+                ctx.lineTo(endX - Math.sin(aimAngle) * 4.5, endY + Math.cos(aimAngle) * 4.5);
+                ctx.lineTo(startX - Math.sin(aimAngle) * 1.8, startY + Math.cos(aimAngle) * 1.8);
+                ctx.closePath();
+
+                ctx.fillStyle = cueGrad;
+                ctx.shadowColor = 'rgba(0, 0, 0, 0.7)';
+                ctx.shadowBlur = 6;
+                ctx.fill();
+                ctx.restore();
+            }
+
+            balls.forEach(b => {
+                if (!b.active) return;
+
+                if (b.isCue && cueBallInHand) {
+                    ctx.beginPath();
+                    ctx.arc(b.x, b.y, BALL_R + 4, 0, Math.PI * 2);
+                    ctx.strokeStyle = '#00ff88';
+                    ctx.lineWidth = 1.8;
+                    ctx.setLineDash([3, 3]);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                    ctx.closePath();
+                }
+
+                ctx.beginPath();
+                ctx.arc(b.x + 1.2, b.y + 1.8, BALL_R, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
+                ctx.fill();
+                ctx.closePath();
+
+                let ballGrad = ctx.createRadialGradient(
+                    b.x - 2.5, b.y - 2.5, 0.5,
+                    b.x, b.y, BALL_R
+                );
+                ballGrad.addColorStop(0, '#ffffff');
+                ballGrad.addColorStop(0.25, b.color);
+                ballGrad.addColorStop(0.85, shadeColor(b.color, -40));
+                ballGrad.addColorStop(1, '#020202');
+
+                ctx.beginPath();
+                ctx.arc(b.x, b.y, BALL_R, 0, Math.PI * 2);
+                ctx.fillStyle = ballGrad;
+                ctx.fill();
+                ctx.closePath();
+
+                if (!b.isCue) {
+                    ctx.beginPath();
+                    ctx.arc(b.x, b.y, 3.6, 0, Math.PI * 2);
+                    ctx.fillStyle = '#ffffff';
+                    ctx.shadowColor = 'rgba(0,0,0,0.4)';
+                    ctx.shadowBlur = 1;
+                    ctx.fill();
+                    ctx.shadowBlur = 0;
+                    ctx.closePath();
+
+                    ctx.fillStyle = '#111111';
+                    ctx.font = 'bold 5px sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(b.number, b.x, b.y);
+                }
+
+                ctx.beginPath();
+                ctx.arc(b.x - 2.2, b.y - 2.2, 1.6, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.75)';
+                ctx.fill();
+                ctx.closePath();
+            });
+
+            requestAnimationFrame(loop);
+        }
+
+        function shadeColor(color, percent) {
+            let num = parseInt(color.replace("#",""), 16);
+            let amt = Math.round(2.55 * percent);
+            let R = (num >> 16) + amt;
+            let G = (num >> 8 & 0x00FF) + amt;
+            let B = (num & 0x0000FF) + amt;
+            return "#" + (0x1000000 + (R<255?R<0?0:R:255)*0x10000 + (G<255?G<0?0:G:255)*0x100 + (B<255?B<0?0:B:255)).toString(16).slice(1);
+        }
+
+        initGame();
+        loop();
+    </script>
+</body>
+</html>
