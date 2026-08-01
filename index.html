@@ -304,10 +304,18 @@
             tg.expand();
         }
 
-        // KONFIGURASI BACKEND SERVER (Ubah URL ini sesuai tempat hosting Express.js kamu)
-        const BACKEND_URL = 'https://link-server-kamu.com'; 
+        const BACKEND_URL = 'https://xxxx.ngrok-free.app'; 
+
         const urlParams = new URLSearchParams(window.location.search);
-        const chatId = urlParams.get('chat_id') || '12345678';
+        let chatId = '12345678';
+        
+        const startAppParam = tg?.initDataUnsafe?.start_param;
+        if (startAppParam && startAppParam.startsWith('room_')) {
+            chatId = startAppParam.replace('room_', '');
+        } else if (urlParams.get('chat_id')) {
+            chatId = urlParams.get('chat_id');
+        }
+
         const currentUserId = tg?.initDataUnsafe?.user?.id || 0;
 
         async function checkTurnPermission() {
@@ -340,11 +348,12 @@
                     chatId: chatId,
                     eventType: eventType,
                     data: { ballNumber: ballNumber }
-                })
-            }).then(() => {
+                }),
+                keepalive: true
+            }).finally(() => {
                 setTimeout(() => {
                     if (tg && tg.close) tg.close();
-                }, 1000);
+                }, 1500);
             });
         }
 
@@ -434,6 +443,27 @@
 
         let choosingPocket = false;
         let selectedPocketId = null;
+
+        // Membuat pola tekstur laken kain biliar secara procedural agar realistis tanpa asset eksternal
+        const feltPatternCanvas = document.createElement('canvas');
+        const fCtx = feltPatternCanvas.getContext('2d');
+        feltPatternCanvas.width = 60;
+        feltPatternCanvas.height = 60;
+        fCtx.fillStyle = '#146331';
+        fCtx.fillRect(0, 0, 60, 60);
+        fCtx.fillStyle = 'rgba(0, 0, 0, 0.04)';
+        for (let i = 0; i < 300; i++) {
+            let rx = Math.random() * 60;
+            let ry = Math.random() * 60;
+            fCtx.fillRect(rx, ry, 1, 1);
+        }
+        fCtx.fillStyle = 'rgba(255, 255, 255, 0.03)';
+        for (let i = 0; i < 200; i++) {
+            let rx = Math.random() * 60;
+            let ry = Math.random() * 60;
+            fCtx.fillRect(rx, ry, 1, 1);
+        }
+        let feltPattern = ctx.createPattern(feltPatternCanvas, 'repeat');
 
         powerSlider.addEventListener('input', () => {
             powerText.innerText = powerSlider.value + '%';
@@ -582,7 +612,7 @@
             let currentList = currentTurn === 1 ? player1Balls : player2Balls;
             let isMyBallsEmpty = currentList.length === 0;
 
-            if (ballsStill() && isMyBallsEmpty && choosingPocket) {
+            if (areAllBallsStill() && isMyBallsEmpty && choosingPocket) {
                 let clickedPocket = pockets.find(p => Math.hypot(mx - p.x, my - p.y) < POCKET_R + 6);
                 if (clickedPocket) {
                     selectedPocketId = clickedPocket.id;
@@ -689,15 +719,12 @@
             aimAngle = Math.atan2(my - cue.y, mx - cue.x);
         }
 
-        function ballsStill() {
-            return areAllBallsStill();
-        }
-
         let wasMoving = false;
 
         function loop() {
             ctx.clearRect(0, 0, LOGICAL_W, LOGICAL_H);
 
+            // Frame Kayu Meja Biliar dengan Efek 3D Bevel/Gradasi Mewah
             ctx.beginPath();
             ctx.roundRect(4, 4, LOGICAL_W - 8, LOGICAL_H - 8, 10);
             let outerWoodGrad = ctx.createLinearGradient(0, 0, LOGICAL_W, LOGICAL_H);
@@ -711,32 +738,34 @@
             ctx.stroke();
             ctx.closePath();
 
+            // Batas Rail / Bantalan Bantal Meja (Cushion Border)
             ctx.beginPath();
             ctx.rect(TABLE_X - 4, TABLE_Y - 4, TABLE_W + 8, TABLE_H + 8);
-            ctx.fillStyle = '#0e4a23';
+            ctx.fillStyle = '#0f5228';
             ctx.fill();
             ctx.lineWidth = 2;
-            ctx.strokeStyle = '#093318';
+            ctx.strokeStyle = '#082b15';
             ctx.stroke();
             ctx.closePath();
 
-            ctx.fillStyle = '#125c2d';
+            // Kain Laken Meja (Menggunakan Pola Tekstur Kain Agar Realistis)
+            ctx.fillStyle = feltPattern;
             ctx.fillRect(TABLE_X, TABLE_Y, TABLE_W, TABLE_H);
 
-            let lightGrad = ctx.createRadialGradient(
-                TABLE_X + TABLE_W / 2, TABLE_Y + TABLE_H / 2, 30,
-                TABLE_X + TABLE_W / 2, TABLE_Y + TABLE_H / 2, TABLE_W * 0.75
+            // Efek Shadow/Vignette Halus di Pinggir Kain (Memberikan Kesan Kedalaman / 3D)
+            let cushionShadow = ctx.createRadialGradient(
+                TABLE_X + TABLE_W / 2, TABLE_Y + TABLE_H / 2, TABLE_W * 0.2,
+                TABLE_X + TABLE_W / 2, TABLE_Y + TABLE_H / 2, TABLE_W * 0.7
             );
-            lightGrad.addColorStop(0, 'rgba(255, 255, 255, 0.15)');
-            lightGrad.addColorStop(0.6, 'rgba(0, 0, 0, 0.1)');
-            lightGrad.addColorStop(1, 'rgba(0, 0, 0, 0.65)');
-            
-            ctx.fillStyle = lightGrad;
+            cushionShadow.addColorStop(0, 'rgba(0, 0, 0, 0)');
+            cushionShadow.addColorStop(1, 'rgba(0, 30, 10, 0.35)');
+            ctx.fillStyle = cushionShadow;
             ctx.fillRect(TABLE_X, TABLE_Y, TABLE_W, TABLE_H);
 
             let currentList = currentTurn === 1 ? player1Balls : player2Balls;
             let isMyBallsEmpty = currentList.length === 0;
 
+            // Render Lubang (Pockets) dengan efek kedalaman
             pockets.forEach(p => {
                 let isHighlighted = choosingPocket || (isMyBallsEmpty && selectedPocketId === p.id);
                 
@@ -753,13 +782,14 @@
 
                 ctx.beginPath();
                 ctx.arc(p.x, p.y, POCKET_R, 0, Math.PI * 2);
-                ctx.fillStyle = '#020305';
+                ctx.fillStyle = '#010103';
                 ctx.fill();
                 ctx.closePath();
 
+                // Lingkaran bibir lubang besi/kulit
                 ctx.beginPath();
                 ctx.arc(p.x, p.y, POCKET_R, 0, Math.PI * 2);
-                ctx.lineWidth = 2;
+                ctx.lineWidth = 2.5;
                 ctx.strokeStyle = '#1a2634';
                 ctx.stroke();
                 ctx.closePath();
@@ -993,38 +1023,6 @@
                     p1BallsContainer.style.boxShadow = 'none';
                     p2BallsContainer.style.boxShadow = 'none';
                 }
-
-                let powerOffset = (parseInt(powerSlider.value) / 100) * 35; 
-                let cueDistFromBall = 16 + powerOffset; 
-                let cueLength = 220;
-                
-                let startX = cue.x - Math.cos(aimAngle) * (BALL_R + cueDistFromBall);
-                let startY = cue.y - Math.sin(aimAngle) * (BALL_R + cueDistFromBall);
-                let endX = startX - Math.cos(aimAngle) * cueLength;
-                let endY = startY - Math.sin(aimAngle) * cueLength;
-
-                ctx.save();
-                let cueGrad = ctx.createLinearGradient(startX, startY, endX, endY);
-                cueGrad.addColorStop(0, '#ffffff');
-                cueGrad.addColorStop(0.04, '#e0d0c0');
-                cueGrad.addColorStop(0.08, '#d4a373');
-                cueGrad.addColorStop(0.35, '#8c5830');
-                cueGrad.addColorStop(0.65, '#5c3516');
-                cueGrad.addColorStop(0.95, '#1f1005');
-                cueGrad.addColorStop(1, '#0d0602');
-
-                ctx.beginPath();
-                ctx.moveTo(startX + Math.sin(aimAngle) * 1.8, startY - Math.cos(aimAngle) * 1.8);
-                ctx.lineTo(endX + Math.sin(aimAngle) * 4.5, endY - Math.cos(aimAngle) * 4.5);
-                ctx.lineTo(endX - Math.sin(aimAngle) * 4.5, endY + Math.cos(aimAngle) * 4.5);
-                ctx.lineTo(startX - Math.sin(aimAngle) * 1.8, startY + Math.cos(aimAngle) * 1.8);
-                ctx.closePath();
-
-                ctx.fillStyle = cueGrad;
-                ctx.shadowColor = 'rgba(0, 0, 0, 0.7)';
-                ctx.shadowBlur = 6;
-                ctx.fill();
-                ctx.restore();
             }
 
             balls.forEach(b => {
@@ -1041,6 +1039,7 @@
                     ctx.closePath();
                 }
 
+                // Bayangan bola di atas meja
                 ctx.beginPath();
                 ctx.arc(b.x + 1.2, b.y + 1.8, BALL_R, 0, Math.PI * 2);
                 ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
