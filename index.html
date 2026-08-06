@@ -4,7 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Briscola Multiplayer</title>
-    <script src="/socket.io/socket.io.js"></script>
+    <!-- CDN Socket.io Client agar bisa diakses dari luar/GitHub Pages -->
+    <script src="https://cdn.jsdelivr.net/npm/socket.io-client@4.7.2/dist/socket.io.min.js"></script>
     <style>
         body {
             margin: 0; padding: 0; background-color: #1a1a1a;
@@ -100,11 +101,12 @@
 </div>
 
 <script>
-    const socket = io();
+    // Terhubung langsung ke Server Termux via Cloudflare Tunnel aktifmu
+    const socket = io('https://republican-shots-janet-investigator.trycloudflare.com');
+    
     let myHand = [];
     let briscolaCard = null;
     let myTurn = false;
-    let currentRoomId = null;
 
     function findMatch() {
         document.getElementById('find-match-btn').style.display = 'none';
@@ -117,7 +119,6 @@
     });
 
     socket.on('game_start', (data) => {
-        currentRoomId = socket.id.startsWith('room_') ? socket.id : socket.rooms ? Array.from(socket.rooms)[1] : null;
         myHand = data.hand;
         briscolaCard = data.briscola;
         myTurn = (data.turn === socket.id);
@@ -138,10 +139,11 @@
         tableArea.appendChild(cardEl);
 
         if (socketId !== socket.id) {
-            // Update jumlah kartu lawan di atas
             const oppArea = document.getElementById('opponent-hand-area');
             oppArea.innerHTML = '';
-            for(let i=0; i<handCount; i++) oppArea.appendChild(document.createElement('div')).className = 'card-back';
+            for(let i = 0; i < handCount; i++) {
+                oppArea.appendChild(document.createElement('div')).className = 'card-back';
+            }
         }
     });
 
@@ -174,7 +176,6 @@
         myTurn = false;
         document.getElementById('message-box').innerText = "Menunggu lawan...";
 
-        // Ambil roomId dari socket rooms di sisi client (via server mapping atau custom event)
         socket.emit('play_card', { cardIndex: index });
     }
 
