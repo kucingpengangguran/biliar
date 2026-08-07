@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Briscola - Multiplayer</title>
+    <!-- Pustaka Socket.io dari Server Termux via Cloudflare Tunnel -->
+    <script src="https://folks-reservation-jews-needs.trycloudflare.com/socket.io/socket.io.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #1a1a1a;
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        .game-container {
+            position: relative;
+            width: 400px;
+            height: 750px;
+            background: #2b4a36;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            box-sizing: border-box;
+            padding: 12px;
+        }
+
+        /* Tombol Musik Backsound di Pojok Atas */
+        .music-control {
+            position: absolute;
+            top: 10px;
+            right: 12px;
+            background: rgba(0, 0, 0, 0.6);
+            color: #ffeb3b;
+            border: 1px solid #ffeb3b;
+            border-radius: 50%;
+            width: 28px;
+            height: 28px;
+            font-size: 12px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            z-index: 50;
+            outline: none;
+        }
+
+        /* Area Kartu Lawan di Atas */
+        .ai-hand-area {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            height: 55px;
+            margin-bottom: 6px;
+        }
+
+        .card-back {
+            width: 38px;
+            height: 55px;
+            background: repeating-linear-gradient(45deg, #444, #444 4px, #666 4px, #666 8px);
+            border-radius: 4px;
+            border: 1px solid #333;
+        }
+
+        /* Kotak Pesan */
+        .message-box {
+            width: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            color: #ffeb3b;
+            padding: 5px 8px;
+            text-align: center;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: bold;
+            box-sizing: border-box;
+            min-height: 22px;
+            margin-bottom: 6px;
+        }
+
+        /* Baris Turn & Briscola di Luar Meja (Atas Meja) */
+        .external-top-info {
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 4px;
+            padding: 0 4px;
+            box-sizing: border-box;
+        }
+
+        .turn-counter {
+            color: #ffeb3b;
+            font-size: 11px;
+            font-weight: bold;
+            background: rgba(0,0,0,0.5);
+            padding: 4px 10px;
+            border-radius: 4px;
+        }
+
+        /* Area Meja Pertarungan Kartu di Tengah-Tengah */
+        .table-area {
+            width: 100%;
+            height: 220px;
+            background: rgba(0, 0, 0, 0.22);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border: 2px dashed rgba(255, 255, 255, 0.4);
+            border-radius: 10px;
+            box-sizing: border-box;
+            position: relative;
+            margin-bottom: 8px;
+            gap: 10px;
+        }
+
+        /* Kartu Briscola di Kiri Tengah, setengah tertutup deck */
+        .table-briscola-slot {
+            position: absolute;
+            left: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            display: flex;
+            align-items: center;
+            z-index: 5;
+        }
+
+        /* Teks Indikator Briscola */
+        .briscola-label-container {
+            position: absolute;
+            top: -18px;
+            left: 0;
+            font-size: 9px;
+            font-weight: bold;
+            color: #ffeb3b;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+            letter-spacing: 0.5px;
+            white-space: nowrap;
+        }
+
+        .briscola-mini-card {
+            width: 38px;
+            height: 55px;
+            background: linear-gradient(135deg, #ffffff 0%, #f0f0f0 100%);
+            border-radius: 4px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 3px;
+            font-size: 9px;
+            font-weight: bold;
+            border: 1px solid #ccc;
+            position: relative;
+        }
+
+        /* Tumpukan dek yang menutupi setengah kartu briscola */
+        .briscola-deck-cover {
+            width: 38px;
+            height: 55px;
+            background: repeating-linear-gradient(45deg, #444, #444 4px, #666 4px, #666 8px);
+            border-radius: 4px;
+            border: 1px solid #333;
+            position: relative;
+            left: -18px;
+            z-index: 6;
+        }
+
+        /* Efek Teks "YOU WON" di Tengah Meja */
+        .you-won-banner {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0.5);
+            background: rgba(255, 235, 59, 0.95);
+            color: #1a1a1a;
+            padding: 6px 16px;
+            font-size: 16px;
+            font-weight: bold;
+            border-radius: 6px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            z-index: 20;
+            opacity: 0;
+            pointer-events: none;
+            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.3s ease;
+        }
+
+        .you-won-banner.show {
+            transform: translate(-50%, -50%) scale(1);
+            opacity: 1;
+        }
+
+        /* Desain Kartu Utama */
+        .card {
+            width: 56px;
+            height: 80px;
+            background: linear-gradient(135deg, #ffffff 0%, #f7f7f7 100%);
+            border-radius: 5px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 4px;
+            font-weight: bold;
+            font-size: 11px;
+            position: relative;
+            z-index: 5;
+            border: 1px solid #cfcfcf;
+            transition: transform 0.4s ease, opacity 0.4s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-4px);
+        }
+
+        .card-inner-art {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 22px;
+            opacity: 0.9;
+        }
+
+        .red { color: #d32f2f; }
+        .black { color: #111; }
+
+        /* Area Tangan Pemain */
+        .player-hand-container {
+            position: relative;
+            width: 100%;
+            height: 110px;
+            display: flex;
+            justify-content: center;
+            align-items: flex-end;
+            padding-bottom: 5px;
+        }
+
+        .player-hand {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            height: 90px;
+            width: 100%;
+            position: relative;
+            z-index: 3;
+        }
+
+        .player-hand .card {
+            width: 62px;
+            height: 90px;
+            font-size: 12px;
+            cursor: pointer;
+        }
+        
+        .player-hand .card .card-inner-art {
+            font-size: 26px;
+        }
+
+        /* Animasi Lembar Kartu */
+        .card.fly-from-player {
+            animation: playerThrowAnim 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+        }
+
+        @keyframes playerThrowAnim {
+            0% { transform: translateY(110px) scale(0.9); opacity: 0.5; }
+            100% { transform: translateY(0px) scale(1); opacity: 1; }
+        }
+
+        .card.fly-from-ai {
+            animation: aiThrowAnim 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+        }
+
+        @keyframes aiThrowAnim {
+            0% { transform: translateY(-110px) scale(0.9); opacity: 0.5; }
+            100% { transform: translateY(0px) scale(1); opacity: 1; }
+        }
+
+        /* Efek Kartu Kesedot & Memudar (Vacuum/Warp) */
+        .card.throw-to-corner {
+            transition: all 0.4s cubic-bezier(0.6, -0.28, 0.735, 0.045) !important;
+            transform: translate(-140px, -70px) scale(0.1) rotate(-90deg) !important;
+            filter: blur(4px);
+            opacity: 0 !important;
+            z-index: 20;
+        }
+
+        /* Modal Lobi & Skor Akhir */
+        .modal {
+            display: none;
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.85);
+            color: white;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            z-index: 100;
+            text-align: center;
+        }
+
+        .modal h2 { color: #ffeb3b; margin-top: 0; }
+        .modal button, .modal input {
+            background: #ffeb3b;
+            border: none;
+            padding: 10px 20px;
+            font-weight: bold;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 6px;
+            font-size: 13px;
+        }
+        .modal input { background: #fff; color: #000; text-align: center; width: 160px; }
+    </style>
+</head>
+<body>
+
+<div class="game-container">
+    <!-- Tombol Kontrol Musik Backsound -->
+    <button class="music-control" id="music-btn" onclick="toggleMusic()">🔊</button>
+
+    <!-- Elemen Audio -->
+    <audio id="bg-music" loop>
+        <source src="monolog.mp3" type="audio/mpeg">
+        Browser Anda tidak mendukung pemutar audio.
+    </audio>
+
+    <!-- Tangan Lawan di Atas -->
+    <div class="ai-hand-area" id="ai-hand-area">
+        <div class="card-back"></div>
+        <div class="card-back"></div>
+        <div class="card-back"></div>
+    </div>
+
+    <!-- Kotak Pesan -->
+    <div class="message-box" id="message-box">Silakan buat atau gabung room lobi!</div>
+
+    <!-- Turn & Briscola di Luar Meja (Bagian Atas) -->
+    <div class="external-top-info">
+        <div class="turn-counter" id="turn-counter-text">Turn: 1 / 20</div>
+    </div>
+
+    <!-- Area Meja Pertarungan Kartu -->
+    <div class="table-area" id="table-area">
+        <div class="table-briscola-slot">
+            <div class="briscola-label-container">BRISCOLA</div>
+            <div class="briscola-mini-card" id="briscola-mini-card"></div>
+            <div class="briscola-deck-cover"></div>
+        </div>
+
+        <div class="you-won-banner" id="you-won-banner">YOU WON!</div>
+    </div>
+
+    <!-- Area Tangan Pemain -->
+    <div class="player-hand-container">
+        <div class="player-hand" id="player-hand"></div>
+    </div>
+
+    <!-- Modal Lobi Awal -->
+    <div class="modal" id="lobby-modal" style="display: flex;">
+        <h2>Briscola Multiplayer</h2>
+        <p style="font-size: 12px; margin-bottom: 12px; color: #ccc;">Mainkan kartu secara online dengan teman!</p>
+        <button onclick="createRoom()">Buat Room Baru</button>
+        <div style="margin: 8px 0; font-size: 11px; color: #aaa;">Atau masukkan kode teman:</div>
+        <input type="text" id="room-code-input" placeholder="Kode Room">
+        <button onclick="joinRoom()">Gabung Room</button>
+    </div>
+
+    <!-- Modal Skor Akhir -->
+    <div class="modal" id="score-modal">
+        <h2>Permainan Selesai!</h2>
+        <div id="score-details" style="font-size: 13px; line-height: 1.5; text-align: left; margin-bottom: 10px;"></div>
+        <button onclick="location.reload()">Menu Utama</button>
+    </div>
+</div>
+
+<script>
+    // Menghubungkan langsung ke server Termux melalui Cloudflare Tunnel
+    const socket = io('https://folks-reservation-jews-needs.trycloudflare.com');
+
+    let playerHand = [];
+    let isMyTurn = false;
+    let briscolaCard = null;
+
+    const suits = [
+        { id: 'D', symbol: '♦', color: 'red' },
+        { id: 'C', symbol: '♥', color: 'red' },
+        { id: 'S', symbol: '♠', color: 'black' },
+        { id: 'B', symbol: '♣', color: 'black' }
+    ];
+
+    let isMusicPlaying = false;
+
+    function toggleMusic() {
+        const music = document.getElementById('bg-music');
+        const btn = document.getElementById('music-btn');
+        if (music.paused) {
+            music.play().then(() => {
+                btn.innerText = "🔊";
+                isMusicPlaying = true;
+            }).catch(e => {
+                console.log("Gagal memutar audio:", e);
+            });
+        } else {
+            music.pause();
+            btn.innerText = "🔇";
+            isMusicPlaying = false;
+        }
+    }
+
+    window.addEventListener('click', () => {
+        const music = document.getElementById('bg-music');
+        const btn = document.getElementById('music-btn');
+        if (!isMusicPlaying) {
+            music.play().then(() => {
+                btn.innerText = "🔊";
+                isMusicPlaying = true;
+            }).catch(() => {});
+        }
+    }, { once: true });
+
+    function createRoom() {
+        socket.emit('createRoom');
+    }
+
+    function joinRoom() {
+        const code = document.getElementById('room-code-input').value.trim().toUpperCase();
+        if (!code) {
+            alert('Masukkan kode room terlebih dahulu!');
+            return;
+        }
+        socket.emit('joinRoom', code);
+    }
+
+    socket.on('roomCreated', (roomCode) => {
+        document.getElementById('lobby-modal').style.display = 'none';
+        setMessage(`Room dibuat! Kode: ${roomCode}. Menunggu teman masuk...`);
+    });
+
+    socket.on('roomJoined', () => {
+        document.getElementById('lobby-modal').style.display = 'none';
+        setMessage("Berhasil bergabung! Menunggu permainan dimulai...");
+    });
+
+    socket.on('errorMsg', (msg) => {
+        alert(msg);
+    });
+
+    socket.on('gameStart', (data) => {
+        document.getElementById('lobby-modal').style.display = 'none';
+        playerHand = data.hand;
+        briscolaCard = data.briscola;
+        isMyTurn = data.isMyTurn;
+        
+        updateUI(data.turnNumber);
+        setMessage(isMyTurn ? "Giliranmu bermain!" : "Giliran lawan bermain...");
+    });
+
+    function playCard(index) {
+        if (!isMyTurn) return;
+
+        const card = playerHand.splice(index, 1)[0];
+        isMyTurn = false;
+        
+        updateUIWithoutHand();
+
+        const tableArea = document.getElementById('table-area');
+        const cardEl = renderCardElement(card);
+        cardEl.classList.add('fly-from-player');
+        tableArea.appendChild(cardEl);
+
+        socket.emit('playCard', card);
+        setMessage("Menunggu respons lawan...");
+    }
+
+    socket.on('cardPlayedOnTable', (card) => {
+        const tableArea = document.getElementById('table-area');
+        const cardEl = renderCardElement(card);
+        cardEl.classList.add('fly-from-ai');
+        tableArea.appendChild(cardEl);
+    });
+
+    socket.on('turnResolved', (data) => {
+        const banner = document.getElementById('you-won-banner');
+        banner.innerText = data.roundWinnerMsg;
+        banner.classList.add('show');
+        setTimeout(() => {
+            banner.classList.remove('show');
+        }, 1200);
+
+        setTimeout(() => {
+            const tableArea = document.getElementById('table-area');
+            const cards = tableArea.querySelectorAll('.card');
+            cards.forEach(c => c.classList.add('throw-to-corner'));
+
+            setTimeout(() => {
+                cards.forEach(c => c.remove());
+                playerHand = data.newHand;
+                isMyTurn = data.isMyTurn;
+                briscolaCard = data.briscola;
+                updateUI(data.turnNumber);
+                setMessage(isMyTurn ? "Giliranmu bermain!" : "Giliran lawan bermain...");
+            }, 600);
+        }, 1500);
+    });
+
+    socket.on('gameOver', (result) => {
+        document.getElementById('score-modal').style.display = 'flex';
+        let details = `
+            <b>${result.winnerText}</b><br><br>
+            • Poin Anda: <b>${result.myPts}</b> Poin<br>
+            • Poin Lawan: <b>${result.opponentPts}</b> Poin<br>
+        `;
+        document.getElementById('score-details').innerHTML = details;
+    });
+
+    function updateUI(turnNum) {
+        const aiArea = document.getElementById('ai-hand-area');
+        aiArea.innerHTML = '';
+        for (let i = 0; i < 3; i++) {
+            aiArea.appendChild(document.createElement('div')).className = 'card-back';
+        }
+
+        if (briscolaCard) {
+            const miniCardEl = document.getElementById('briscola-mini-card');
+            miniCardEl.className = `briscola-mini-card ${briscolaCard.color}`;
+            miniCardEl.innerHTML = `
+                <div>${briscolaCard.val}${briscolaCard.symbol}</div>
+                <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 14px;">${briscolaCard.symbol}</div>
+                <div style="transform: rotate(180deg); align-self: flex-end;">${briscolaCard.val}${briscolaCard.symbol}</div>
+            `;
+        }
+
+        document.getElementById('turn-counter-text').innerText = `Turn: ${turnNum} / 20`;
+
+        const handArea = document.getElementById('player-hand');
+        handArea.innerHTML = '';
+        playerHand.forEach((card, index) => {
+            const cardEl = renderCardElement(card);
+            cardEl.onclick = () => playCard(index);
+            handArea.appendChild(cardEl);
+        });
+    }
+
+    function updateUIWithoutHand() {
+        const handArea = document.getElementById('player-hand');
+        handArea.innerHTML = '';
+        playerHand.forEach((card, index) => {
+            const cardEl = renderCardElement(card);
+            cardEl.onclick = () => playCard(index);
+            handArea.appendChild(cardEl);
+        });
+    }
+
+    function renderCardElement(card) {
+        const el = document.createElement('div');
+        el.className = `card ${card.color}`;
+        el.innerHTML = `
+            <div>${card.val}${card.symbol}</div>
+            <div class="card-inner-art">${card.symbol}</div>
+            <div style="transform: rotate(180deg); align-self: flex-end;">${card.val}${card.symbol}</div>
+        `;
+        return el;
+    }
+
+    function setMessage(msg) {
+        document.getElementById('message-box').innerText = msg;
+    }
+</script>
+
+</body>
+</html>
