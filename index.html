@@ -147,7 +147,7 @@
             z-index: 6;
         }
 
-        .you-won-banner {
+        .winner-banner {
             position: absolute;
             top: 50%;
             left: 50%;
@@ -155,17 +155,18 @@
             background: rgba(255, 235, 59, 0.95);
             color: #1a1a1a;
             padding: 6px 16px;
-            font-size: 16px;
+            font-size: 15px;
             font-weight: bold;
             border-radius: 6px;
             box-shadow: 0 4px 15px rgba(0,0,0,0.5);
             z-index: 20;
             opacity: 0;
             pointer-events: none;
+            white-space: nowrap;
             transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.3s ease;
         }
 
-        .you-won-banner.show {
+        .winner-banner.show {
             transform: translate(-50%, -50%) scale(1);
             opacity: 1;
         }
@@ -310,7 +311,7 @@
             <div class="briscola-deck-cover"></div>
         </div>
 
-        <div class="you-won-banner" id="you-won-banner">YOU WON!</div>
+        <div class="winner-banner" id="winner-banner">YOU WON!</div>
     </div>
 
     <div class="player-hand-container">
@@ -328,7 +329,7 @@
 
     <div class="modal" id="score-modal">
         <h2>Permainan Selesai!</h2>
-        <div id="score-details" style="font-size: 13px; line-height: 1.5; text-align: left; margin-bottom: 10px;"></div>
+        <div id="score-details" style="font-size: 13px; line-height: 1.6; text-align: center; margin-bottom: 15px;"></div>
         <button onclick="location.reload()">Menu Utama</button>
     </div>
 </div>
@@ -336,7 +337,6 @@
 <script>
     const socket = io('https://folks-reservation-jews-needs.trycloudflare.com');
 
-    // Ambil Nama Telegram
     const tg = window.Telegram.WebApp;
     if (tg && tg.expand) tg.expand();
     const myName = tg.initDataUnsafe?.user?.first_name || "Pemain";
@@ -346,7 +346,6 @@
     let isMyTurn = false;
     let briscolaCard = null;
 
-    // Tampilkan nama di sub lobi
     document.getElementById('welcome-sub').innerText = `Halo, ${myName}! Mainkan kartu secara online.`;
 
     document.addEventListener("visibilitychange", () => {
@@ -359,7 +358,6 @@
         socket.emit('syncGame');
     });
 
-    // Fungsi Sound Effects (SFX) interaktif
     function playSoundEffect(type) {
         try {
             const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -370,7 +368,6 @@
             gainNode.connect(audioCtx.destination);
 
             if (type === 'my_turn') {
-                // Suara giliran sendiri (Nada naik ceria)
                 osc.type = 'sine';
                 osc.frequency.setValueAtTime(587.33, audioCtx.currentTime);
                 osc.frequency.setValueAtTime(880, audioCtx.currentTime + 0.1);
@@ -379,7 +376,6 @@
                 osc.start();
                 osc.stop(audioCtx.currentTime + 0.3);
             } else if (type === 'opponent_turn') {
-                // Suara giliran lawan (Nada datar rendah)
                 osc.type = 'triangle';
                 osc.frequency.setValueAtTime(300, audioCtx.currentTime);
                 gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
@@ -387,7 +383,6 @@
                 osc.start();
                 osc.stop(audioCtx.currentTime + 0.2);
             } else if (type === 'card_throw') {
-                // Suara kartu dilempar (Efek swoosh/noise singkat)
                 osc.type = 'sawtooth';
                 osc.frequency.setValueAtTime(150, audioCtx.currentTime);
                 osc.frequency.exponentialRampToValueAtTime(40, audioCtx.currentTime + 0.15);
@@ -396,11 +391,10 @@
                 osc.start();
                 osc.stop(audioCtx.currentTime + 0.15);
             } else if (type === 'round_win') {
-                // Suara menang ronde (Chime gembira)
                 osc.type = 'sine';
-                osc.frequency.setValueAtTime(523.25, audioCtx.currentTime); // C5
-                osc.frequency.setValueAtTime(659.25, audioCtx.currentTime + 0.1); // E5
-                osc.frequency.setValueAtTime(783.99, audioCtx.currentTime + 0.2); // G5
+                osc.frequency.setValueAtTime(523.25, audioCtx.currentTime);
+                osc.frequency.setValueAtTime(659.25, audioCtx.currentTime + 0.1);
+                osc.frequency.setValueAtTime(783.99, audioCtx.currentTime + 0.2);
                 gainNode.gain.setValueAtTime(0.12, audioCtx.currentTime);
                 gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.4);
                 osc.start();
@@ -478,7 +472,6 @@
         
         updateUIWithoutHand();
 
-        // Mainkan efek suara lempar kartu
         playSoundEffect('card_throw');
 
         const tableArea = document.getElementById('table-area');
@@ -501,8 +494,15 @@
 
     socket.on('turnResolved', (data) => {
         playSoundEffect('round_win');
-        const banner = document.getElementById('you-won-banner');
-        banner.innerText = data.roundWinnerMsg;
+        const banner = document.getElementById('winner-banner');
+        
+        // Menentukan teks banner berdasarkan siapa yang menang ronde
+        if (data.roundWinnerName === myName) {
+            banner.innerText = "YOU WON!";
+        } else {
+            banner.innerText = `${data.roundWinnerName.toUpperCase()} WON!`;
+        }
+
         banner.classList.add('show');
         setTimeout(() => {
             banner.classList.remove('show');
@@ -533,10 +533,12 @@
 
     socket.on('gameOver', (result) => {
         document.getElementById('score-modal').style.display = 'flex';
+        
+        // Tampilan ringkas pemenang dan total poin masing-masing
         let details = `
-            <b>${result.winnerText}</b><br><br>
-            • Poin Anda: <b>${result.myPts}</b> Poin<br>
-            • Poin Lawan: <b>${result.opponentPts}</b> Poin<br>
+            <div style="font-size: 16px; color: #ffeb3b; margin-bottom: 10px;"><b>${result.winnerText}</b></div>
+            <div>${myName}: <b>${result.myPts} Poin</b></div>
+            <div>${oppName}: <b>${result.opponentPts} Poin</b></div>
         `;
         document.getElementById('score-details').innerHTML = details;
     });
@@ -552,9 +554,9 @@
             const miniCardEl = document.getElementById('briscola-mini-card');
             miniCardEl.className = `briscola-mini-card ${briscolaCard.color}`;
             miniCardEl.innerHTML = `
-                <div>${briscolaCard.val}${briscolaCard.symbol}</div>
-                <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 14px;">${briscolaCard.symbol}</div>
-                <div style="transform: rotate(180deg); align-self: flex-end;">${briscolaCard.val}${briscolaCard.symbol}</div>
+                <div>${briscolaCard.val}${getSymbolHTML(briscolaCard.symbol)}</div>
+                <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 14px;">${getSymbolHTML(briscolaCard.symbol)}</div>
+                <div style="transform: rotate(180deg); align-self: flex-end;">${briscolaCard.val}${getSymbolHTML(briscolaCard.symbol)}</div>
             `;
         }
 
@@ -579,13 +581,23 @@
         });
     }
 
+    // Helper untuk memastikan simbol kartu remi menggunakan entitas HTML standar
+    function getSymbolHTML(symbol) {
+        if (symbol === '♠' || symbol === 'spades') return '&spades;';
+        if (symbol === '♣' || symbol === 'clubs') return '&clubs;';
+        if (symbol === '♦' || symbol === 'diams') return '&diams;';
+        if (symbol === '♥' || symbol === 'hearts') return '&hearts;';
+        return symbol;
+    }
+
     function renderCardElement(card) {
         const el = document.createElement('div');
+        const symHTML = getSymbolHTML(card.symbol);
         el.className = `card ${card.color}`;
         el.innerHTML = `
-            <div>${card.val}${card.symbol}</div>
-            <div class="card-inner-art">${card.symbol}</div>
-            <div style="transform: rotate(180deg); align-self: flex-end;">${card.val}${card.symbol}</div>
+            <div>${card.val}${symHTML}</div>
+            <div class="card-inner-art">${symHTML}</div>
+            <div style="transform: rotate(180deg); align-self: flex-end;">${card.val}${symHTML}</div>
         `;
         return el;
     }
