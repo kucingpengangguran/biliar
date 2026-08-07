@@ -399,6 +399,39 @@
 
     let isMusicPlaying = false;
 
+    // Fungsi untuk memutar bunyi notif otomatis menggunakan Web Audio API
+    function playTurnNotification(type) {
+        try {
+            const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            const osc = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            
+            osc.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+
+            if (type === 'my_turn') {
+                // Bunyi tinggi bernada ceria (Giliran Pemain)
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(587.33, audioCtx.currentTime); // D5
+                osc.frequency.setValueAtTime(880, audioCtx.currentTime + 0.1); // A5
+                gainNode.gain.setValueAtTime(0.15, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.3);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.3);
+            } else {
+                // Bunyi rendah bernada datar (Giliran Lawan)
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(300, audioCtx.currentTime);
+                gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.2);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.2);
+            }
+        } catch (e) {
+            console.log("AudioContext diblokir browser sebelum interaksi pengguna.");
+        }
+    }
+
     function toggleMusic() {
         const music = document.getElementById('bg-music');
         const btn = document.getElementById('music-btn');
@@ -461,13 +494,23 @@
         isMyTurn = data.isMyTurn;
         
         updateUI(data.turnNumber);
-        setMessage(isMyTurn ? "Giliranmu bermain!" : "Giliran lawan bermain...");
+        
+        if (isMyTurn) {
+            playTurnNotification('my_turn');
+            setMessage("🔔 Giliranmu bermain!");
+        } else {
+            playTurnNotification('opponent_turn');
+            setMessage("⏳ Giliran lawan bermain...");
+        }
     });
 
     function playCard(index) {
         if (!isMyTurn) return;
 
-        const card = playerHand.splice(index, 1)[0];
+        const card = playerHand[index];
+        if (!card) return;
+        
+        playerHand.splice(index, 1);
         isMyTurn = false;
         
         updateUIWithoutHand();
@@ -478,6 +521,7 @@
         tableArea.appendChild(cardEl);
 
         socket.emit('playCard', card);
+        playTurnNotification('opponent_turn');
         setMessage("Menunggu respons lawan...");
     }
 
@@ -507,7 +551,14 @@
                 isMyTurn = data.isMyTurn;
                 briscolaCard = data.briscola;
                 updateUI(data.turnNumber);
-                setMessage(isMyTurn ? "Giliranmu bermain!" : "Giliran lawan bermain...");
+                
+                if (isMyTurn) {
+                    playTurnNotification('my_turn');
+                    setMessage("🔔 Giliranmu bermain!");
+                } else {
+                    playTurnNotification('opponent_turn');
+                    setMessage("⏳ Giliran lawan bermain...");
+                }
             }, 600);
         }, 1500);
     });
