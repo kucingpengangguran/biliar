@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="id">
 <head>
@@ -36,73 +35,34 @@
             padding: 12px;
         }
 
-        .music-control {
-            position: absolute;
-            top: 10px;
-            right: 12px;
-            background: rgba(0, 0, 0, 0.6);
-            color: #ffeb3b;
-            border: 1px solid #ffeb3b;
-            border-radius: 50%;
-            width: 28px;
-            height: 28px;
-            font-size: 12px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            cursor: pointer;
-            z-index: 50;
-            outline: none;
-        }
-
-        /* --- UI AREA LAWAN (TOP) --- */
-        .opponent-profile-area {
-            width: 100%;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            margin-bottom: 4px;
-        }
-
-        .opponent-name-tag {
-            background: rgba(0, 0, 0, 0.4);
-            color: #ffeb3b;
-            padding: 3px 10px;
-            border-radius: 10px;
-            font-size: 11px;
-            font-weight: bold;
-            margin-bottom: 4px;
-            border: 1px solid rgba(255, 235, 59, 0.3);
-        }
-
         .ai-hand-area {
             display: flex;
             justify-content: center;
-            gap: 6px;
-            height: 50px;
+            gap: 8px;
+            height: 55px;
+            margin-bottom: 6px;
         }
 
         .card-back {
-            width: 35px;
-            height: 50px;
+            width: 38px;
+            height: 55px;
             background: repeating-linear-gradient(45deg, #444, #444 4px, #666 4px, #666 8px);
             border-radius: 4px;
             border: 1px solid #333;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
         }
 
         .message-box {
             width: 100%;
             background: rgba(0, 0, 0, 0.7);
             color: #ffeb3b;
-            padding: 6px 8px;
+            padding: 5px 8px;
             text-align: center;
             border-radius: 6px;
             font-size: 11px;
             font-weight: bold;
             box-sizing: border-box;
-            min-height: 24px;
-            margin: 6px 0;
+            min-height: 22px;
+            margin-bottom: 6px;
         }
 
         .external-top-info {
@@ -126,7 +86,7 @@
 
         .table-area {
             width: 100%;
-            height: 200px;
+            height: 220px;
             background: rgba(0, 0, 0, 0.22);
             display: flex;
             justify-content: center;
@@ -243,34 +203,14 @@
         .red { color: #d32f2f; }
         .black { color: #111; }
 
-        /* --- UI AREA PEMAIN (BOTTOM) --- */
-        .player-profile-area {
-            width: 100%;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 0 4px;
-            margin-bottom: 2px;
-            box-sizing: border-box;
-        }
-
-        .player-name-tag {
-            background: rgba(0, 0, 0, 0.4);
-            color: #4caf50;
-            padding: 3px 10px;
-            border-radius: 10px;
-            font-size: 11px;
-            font-weight: bold;
-            border: 1px solid rgba(76, 175, 80, 0.3);
-        }
-
         .player-hand-container {
             position: relative;
             width: 100%;
-            height: 100px;
+            height: 110px;
             display: flex;
             justify-content: center;
             align-items: flex-end;
+            padding-bottom: 5px;
         }
 
         .player-hand {
@@ -351,20 +291,10 @@
 <body>
 
 <div class="game-container">
-    <button class="music-control" id="music-btn" onclick="toggleMusic()">🔊</button>
-
-    <audio id="bg-music" loop>
-        <source src="monolog.mp3" type="audio/mpeg">
-    </audio>
-
-    <!-- Area Lawan (Atas) -->
-    <div class="opponent-profile-area">
-        <div class="opponent-name-tag" id="opponent-name-tag">Lawan: Menunggu...</div>
-        <div class="ai-hand-area" id="ai-hand-area">
-            <div class="card-back"></div>
-            <div class="card-back"></div>
-            <div class="card-back"></div>
-        </div>
+    <div class="ai-hand-area" id="ai-hand-area">
+        <div class="card-back"></div>
+        <div class="card-back"></div>
+        <div class="card-back"></div>
     </div>
 
     <div class="message-box" id="message-box">Silakan buat atau gabung room lobi!</div>
@@ -381,11 +311,6 @@
         </div>
 
         <div class="you-won-banner" id="you-won-banner">YOU WON!</div>
-    </div>
-
-    <!-- Area Anda (Bawah) -->
-    <div class="player-profile-area">
-        <div class="player-name-tag" id="player-name-tag">Anda: ...</div>
     </div>
 
     <div class="player-hand-container">
@@ -411,6 +336,7 @@
 <script>
     const socket = io('https://folks-reservation-jews-needs.trycloudflare.com');
 
+    // Ambil Nama Telegram
     const tg = window.Telegram.WebApp;
     if (tg && tg.expand) tg.expand();
     const myName = tg.initDataUnsafe?.user?.first_name || "Pemain";
@@ -419,10 +345,9 @@
     let playerHand = [];
     let isMyTurn = false;
     let briscolaCard = null;
-    let isMusicPlaying = false;
 
+    // Tampilkan nama di sub lobi
     document.getElementById('welcome-sub').innerText = `Halo, ${myName}! Mainkan kartu secara online.`;
-    document.getElementById('player-name-tag').innerText = `Anda: ${myName}`;
 
     document.addEventListener("visibilitychange", () => {
         if (document.visibilityState === "visible") {
@@ -434,7 +359,8 @@
         socket.emit('syncGame');
     });
 
-    function playTurnNotification(type) {
+    // Fungsi Sound Effects (SFX) interaktif
+    function playSoundEffect(type) {
         try {
             const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
             const osc = audioCtx.createOscillator();
@@ -444,6 +370,7 @@
             gainNode.connect(audioCtx.destination);
 
             if (type === 'my_turn') {
+                // Suara giliran sendiri (Nada naik ceria)
                 osc.type = 'sine';
                 osc.frequency.setValueAtTime(587.33, audioCtx.currentTime);
                 osc.frequency.setValueAtTime(880, audioCtx.currentTime + 0.1);
@@ -451,44 +378,38 @@
                 gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.3);
                 osc.start();
                 osc.stop(audioCtx.currentTime + 0.3);
-            } else {
+            } else if (type === 'opponent_turn') {
+                // Suara giliran lawan (Nada datar rendah)
                 osc.type = 'triangle';
                 osc.frequency.setValueAtTime(300, audioCtx.currentTime);
                 gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
                 gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.2);
                 osc.start();
                 osc.stop(audioCtx.currentTime + 0.2);
+            } else if (type === 'card_throw') {
+                // Suara kartu dilempar (Efek swoosh/noise singkat)
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(150, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(40, audioCtx.currentTime + 0.15);
+                gainNode.gain.setValueAtTime(0.12, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.15);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.15);
+            } else if (type === 'round_win') {
+                // Suara menang ronde (Chime gembira)
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(523.25, audioCtx.currentTime); // C5
+                osc.frequency.setValueAtTime(659.25, audioCtx.currentTime + 0.1); // E5
+                osc.frequency.setValueAtTime(783.99, audioCtx.currentTime + 0.2); // G5
+                gainNode.gain.setValueAtTime(0.12, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.4);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.4);
             }
         } catch (e) {
             console.log("Audio diblokir browser.");
         }
     }
-
-    function toggleMusic() {
-        const music = document.getElementById('bg-music');
-        const btn = document.getElementById('music-btn');
-        if (music.paused) {
-            music.play().then(() => {
-                btn.innerText = "🔊";
-                isMusicPlaying = true;
-            }).catch(e => {});
-        } else {
-            music.pause();
-            btn.innerText = "🔇";
-            isMusicPlaying = false;
-        }
-    }
-
-    window.addEventListener('click', () => {
-        const music = document.getElementById('bg-music');
-        const btn = document.getElementById('music-btn');
-        if (!isMusicPlaying) {
-            music.play().then(() => {
-                btn.innerText = "🔊";
-                isMusicPlaying = true;
-            }).catch(() => {});
-        }
-    }, { once: true });
 
     function createRoom() {
         socket.emit('createRoom', myName);
@@ -524,26 +445,25 @@
         isMyTurn = data.isMyTurn;
         oppName = data.oppName;
         
-        document.getElementById('opponent-name-tag').innerText = `Lawan: ${oppName}`;
         updateUI(data.turnNumber);
         
         if (isMyTurn) {
-            playTurnNotification('my_turn');
-            setMessage(`Giliranmu ${myName}!`);
+            playSoundEffect('my_turn');
+            setMessage(`🔔 Giliranmu ${myName}!`);
         } else {
-            playTurnNotification('opponent_turn');
-            setMessage(`Giliran ${oppName}...`);
+            playSoundEffect('opponent_turn');
+            setMessage(`⏳ Giliran ${oppName}...`);
         }
     });
 
     socket.on('updateTurnState', (data) => {
         isMyTurn = data.isMyTurn;
         if (isMyTurn) {
-            playTurnNotification('my_turn');
-            setMessage(`Giliranmu ${myName}!`);
+            playSoundEffect('my_turn');
+            setMessage(`🔔 Giliranmu ${myName}!`);
         } else {
-            playTurnNotification('opponent_turn');
-            setMessage(`Giliran ${oppName}...`);
+            playSoundEffect('opponent_turn');
+            setMessage(`⏳ Giliran ${oppName}...`);
         }
     });
 
@@ -558,17 +478,21 @@
         
         updateUIWithoutHand();
 
+        // Mainkan efek suara lempar kartu
+        playSoundEffect('card_throw');
+
         const tableArea = document.getElementById('table-area');
         const cardEl = renderCardElement(card);
         cardEl.classList.add('fly-from-player');
         tableArea.appendChild(cardEl);
 
         socket.emit('playCard', card);
-        playTurnNotification('opponent_turn');
-        setMessage(`⏳ ${oppName}...`);
+        playSoundEffect('opponent_turn');
+        setMessage(`Menunggu respons ${oppName}...`);
     }
 
     socket.on('cardPlayedOnTable', (card) => {
+        playSoundEffect('card_throw');
         const tableArea = document.getElementById('table-area');
         const cardEl = renderCardElement(card);
         cardEl.classList.add('fly-from-ai');
@@ -576,6 +500,7 @@
     });
 
     socket.on('turnResolved', (data) => {
+        playSoundEffect('round_win');
         const banner = document.getElementById('you-won-banner');
         banner.innerText = data.roundWinnerMsg;
         banner.classList.add('show');
@@ -596,11 +521,11 @@
                 updateUI(data.turnNumber);
                 
                 if (isMyTurn) {
-                    playTurnNotification('my_turn');
-                    setMessage(`Giliranmu ${myName}!`);
+                    playSoundEffect('my_turn');
+                    setMessage(`🔔 Giliranmu ${myName}!`);
                 } else {
-                    playTurnNotification('opponent_turn');
-                    setMessage(`Giliran ${oppName}...`);
+                    playSoundEffect('opponent_turn');
+                    setMessage(`⏳ Giliran ${oppName}...`);
                 }
             }, 600);
         }, 1500);
@@ -610,8 +535,8 @@
         document.getElementById('score-modal').style.display = 'flex';
         let details = `
             <b>${result.winnerText}</b><br><br>
-            • Poin Anda (${myName}): <b>${result.myPts}</b> Poin<br>
-            • Poin Lawan (${oppName}): <b>${result.opponentPts}</b> Poin<br>
+            • Poin Anda: <b>${result.myPts}</b> Poin<br>
+            • Poin Lawan: <b>${result.opponentPts}</b> Poin<br>
         `;
         document.getElementById('score-details').innerHTML = details;
     });
@@ -627,4 +552,48 @@
             const miniCardEl = document.getElementById('briscola-mini-card');
             miniCardEl.className = `briscola-mini-card ${briscolaCard.color}`;
             miniCardEl.innerHTML = `
-                <div>${briscolaCard.val}${bris
+                <div>${briscolaCard.val}${briscolaCard.symbol}</div>
+                <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 14px;">${briscolaCard.symbol}</div>
+                <div style="transform: rotate(180deg); align-self: flex-end;">${briscolaCard.val}${briscolaCard.symbol}</div>
+            `;
+        }
+
+        document.getElementById('turn-counter-text').innerText = `Turn: ${turnNum} / 20`;
+
+        const handArea = document.getElementById('player-hand');
+        handArea.innerHTML = '';
+        playerHand.forEach((card, index) => {
+            const cardEl = renderCardElement(card);
+            cardEl.onclick = () => playCard(index);
+            handArea.appendChild(cardEl);
+        });
+    }
+
+    function updateUIWithoutHand() {
+        const handArea = document.getElementById('player-hand');
+        handArea.innerHTML = '';
+        playerHand.forEach((card, index) => {
+            const cardEl = renderCardElement(card);
+            cardEl.onclick = () => playCard(index);
+            handArea.appendChild(cardEl);
+        });
+    }
+
+    function renderCardElement(card) {
+        const el = document.createElement('div');
+        el.className = `card ${card.color}`;
+        el.innerHTML = `
+            <div>${card.val}${card.symbol}</div>
+            <div class="card-inner-art">${card.symbol}</div>
+            <div style="transform: rotate(180deg); align-self: flex-end;">${card.val}${card.symbol}</div>
+        `;
+        return el;
+    }
+
+    function setMessage(msg) {
+        document.getElementById('message-box').innerText = msg;
+    }
+</script>
+
+</body>
+</html>
