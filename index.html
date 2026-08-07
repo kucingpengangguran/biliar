@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Briscola - Multiplayer</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://folks-reservation-jews-needs.trycloudflare.com/socket.io/socket.io.js"></script>
     <style>
         body {
@@ -343,7 +344,7 @@
 
     <div class="modal" id="lobby-modal" style="display: flex;">
         <h2>Briscola Multiplayer</h2>
-        <p style="font-size: 12px; margin-bottom: 12px; color: #ccc;">Mainkan kartu secara online dengan teman!</p>
+        <p style="font-size: 12px; margin-bottom: 12px; color: #ccc;" id="welcome-sub">Mainkan kartu secara online dengan teman!</p>
         <button onclick="createRoom()">Buat Room Baru</button>
         <div style="margin: 8px 0; font-size: 11px; color: #aaa;">Atau masukkan kode teman:</div>
         <input type="text" id="room-code-input" placeholder="Kode Room">
@@ -360,10 +361,29 @@
 <script>
     const socket = io('https://folks-reservation-jews-needs.trycloudflare.com');
 
+    // Ambil Nama Telegram
+    const tg = window.Telegram.WebApp;
+    if (tg && tg.expand) tg.expand();
+    const myName = tg.initDataUnsafe?.user?.first_name || "Pemain";
+    let oppName = "Lawan";
+
     let playerHand = [];
     let isMyTurn = false;
     let briscolaCard = null;
     let isMusicPlaying = false;
+
+    // Tampilkan nama di sub lobi
+    document.getElementById('welcome-sub').innerText = `Halo, ${myName}! Mainkan kartu secara online.`;
+
+    document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "visible") {
+            socket.emit('syncGame');
+        }
+    });
+
+    socket.on('reconnect', () => {
+        socket.emit('syncGame');
+    });
 
     function playTurnNotification(type) {
         try {
@@ -422,7 +442,7 @@
     }, { once: true });
 
     function createRoom() {
-        socket.emit('createRoom');
+        socket.emit('createRoom', myName);
     }
 
     function joinRoom() {
@@ -431,7 +451,7 @@
             alert('Masukkan kode room terlebih dahulu!');
             return;
         }
-        socket.emit('joinRoom', code);
+        socket.emit('joinRoom', { code, playerName: myName });
     }
 
     socket.on('roomCreated', (roomCode) => {
@@ -453,15 +473,16 @@
         playerHand = data.hand;
         briscolaCard = data.briscola;
         isMyTurn = data.isMyTurn;
+        oppName = data.oppName;
         
         updateUI(data.turnNumber);
         
         if (isMyTurn) {
             playTurnNotification('my_turn');
-            setMessage("🔔 Giliranmu bermain!");
+            setMessage(`🔔 Giliranmu ${myName}!`);
         } else {
             playTurnNotification('opponent_turn');
-            setMessage("⏳ Giliran lawan bermain...");
+            setMessage(`⏳ Giliran ${oppName}...`);
         }
     });
 
@@ -469,10 +490,10 @@
         isMyTurn = data.isMyTurn;
         if (isMyTurn) {
             playTurnNotification('my_turn');
-            setMessage("🔔 Giliranmu bermain!");
+            setMessage(`🔔 Giliranmu ${myName}!`);
         } else {
             playTurnNotification('opponent_turn');
-            setMessage("⏳ Giliran lawan bermain...");
+            setMessage(`⏳ Giliran ${oppName}...`);
         }
     });
 
@@ -494,7 +515,7 @@
 
         socket.emit('playCard', card);
         playTurnNotification('opponent_turn');
-        setMessage("Menunggu respons lawan...");
+        setMessage(`Menunggu respons ${oppName}...`);
     }
 
     socket.on('cardPlayedOnTable', (card) => {
@@ -526,10 +547,10 @@
                 
                 if (isMyTurn) {
                     playTurnNotification('my_turn');
-                    setMessage("🔔 Giliranmu bermain!");
+                    setMessage(`🔔 Giliranmu ${myName}!`);
                 } else {
                     playTurnNotification('opponent_turn');
-                    setMessage("⏳ Giliran lawan bermain...");
+                    setMessage(`⏳ Giliran ${oppName}...`);
                 }
             }, 600);
         }, 1500);
