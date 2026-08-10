@@ -1,0 +1,1097 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>8 Ball Pool Pro - Points Mode</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+        body, html {
+            width: 100%; height: 100%; overflow: hidden;
+            background: #030712;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            display: flex; justify-content: center; align-items: center;
+        }
+
+        .game-container {
+            display: flex; flex-direction: column; align-items: center; justify-content: space-between;
+            width: 100%; max-width: 440px; height: 100dvh;
+            background: #0b0f19; position: relative; padding: 6px;
+            box-shadow: 0 0 40px rgba(0,0,0,0.95);
+        }
+
+        .room-modal {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(3, 7, 18, 0.92); z-index: 200;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            padding: 24px; text-align: center; backdrop-filter: blur(6px);
+        }
+        .room-card {
+            background: rgba(15, 23, 42, 0.95); border: 1.5px solid rgba(56, 189, 248, 0.3);
+            border-radius: 20px; padding: 24px; width: 100%; max-width: 320px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+        }
+        .room-title { font-size: 18px; font-weight: 800; color: #38bdf8; margin-bottom: 8px; }
+        .room-desc { font-size: 11px; color: #94a3b8; margin-bottom: 20px; }
+        .room-input {
+            width: 100%; height: 44px; background: #020617; border: 1.5px solid #334155;
+            border-radius: 12px; color: #ffffff; font-size: 15px; font-weight: bold;
+            text-align: center; margin-bottom: 14px; outline: none; transition: border-color 0.2s;
+        }
+        .room-input:focus { border-color: #0ea5e9; }
+        .room-btn {
+            width: 100%; height: 44px; background: #0ea5e9; border: none; border-radius: 12px;
+            color: #0f172a; font-size: 13px; font-weight: 800; cursor: pointer;
+            box-shadow: 0 4px 15px rgba(14, 165, 233, 0.4); transition: transform 0.1s;
+        }
+        .room-btn:active { transform: scale(0.97); }
+
+        .top-notification {
+            width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            display: none; flex-direction: column;
+            justify-content: center; align-items: center;
+            position: absolute; top: 0; left: 0; z-index: 100;
+            backdrop-filter: blur(3px);
+            animation: fadeIn 0.1s ease forwards;
+        }
+        .top-notification.show { display: flex; }
+        .notif-content-box {
+            background: rgba(30, 10, 10, 0.9);
+            border: 1.5px solid rgba(239, 68, 68, 0.8); border-radius: 14px;
+            padding: 14px 24px; text-align: center;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+            max-width: 80%;
+        }
+        .top-notification.win-mode .notif-content-box { background: rgba(10, 30, 20, 0.9); border-color: rgba(10, 185, 129, 0.8); }
+        .notif-title { font-size: 16px; font-weight: 800; color: #ef4444; letter-spacing: 0.5px; }
+        .top-notification.win-mode .notif-title { color: #10b981; }
+        .notif-sub { font-size: 11px; font-weight: normal; color: #f1f5f9; margin-top: 3px; display: block; }
+
+        @keyframes fadeIn {
+            0% { opacity: 0; }
+            100% { opacity: 1; }
+        }
+
+        .turn-banner {
+            font-size: 11px; font-weight: 800; color: #38bdf8;
+            text-align: center; width: 100%; margin-bottom: 2px;
+            letter-spacing: 0.5px; flex-shrink: 0;
+        }
+
+        .top-players-hud {
+            display: flex; align-items: center; justify-content: space-between;
+            width: 100%; max-width: 420px;
+            background: rgba(15, 23, 42, 0.95);
+            border: 1.5px solid rgba(255, 255, 255, 0.12);
+            border-radius: 14px; padding: 10px 14px; gap: 6px;
+            flex-shrink: 0; box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+        }
+        .player-side-group { display: flex; align-items: center; gap: 10px; opacity: 0.45; transition: all 0.2s ease; flex: 1; min-width: 0; }
+        .player-side-group.active-turn { opacity: 1; transform: scale(1.02); }
+        .player-side-group.p2-side { justify-content: flex-end; flex-direction: row; }
+        
+        .player-num-box {
+            width: 28px; height: 28px; border-radius: 50%;
+            background: #1e293b; border: 1.5px solid #475569;
+            display: flex; justify-content: center; align-items: center;
+            font-size: 13px; font-weight: bold; color: #f1f5f9; flex-shrink: 0;
+            overflow: hidden;
+        }
+        .player-side-group.active-turn .player-num-box {
+            background: #0ea5e9; border-color: #38bdf8; box-shadow: 0 0 10px rgba(14, 165, 233, 0.7); color: #ffffff;
+        }
+
+        .score-info { display: flex; flex-direction: column; min-width: 0; }
+        .player-side-group.p2-side .score-info { align-items: flex-end; }
+        .score-label { font-size: 9px; color: #94a3b8; font-weight: bold; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100px; }
+        .score-value { font-size: 15px; font-weight: 800; color: #facc15; }
+
+        .vs-container { display: flex; flex-direction: column; align-items: center; justify-content: center; flex-shrink: 0; padding: 0 10px; }
+        .vs-text { font-size: 11px; font-weight: 800; color: #fbbf24; }
+        .timer-text { font-size: 10px; color: #38bdf8; font-weight: bold; margin-top: 1px; }
+
+        .board-layout { display: flex; justify-content: center; align-items: center; flex-grow: 1; margin: 4px 0; overflow: hidden; position: relative; }
+        #pool-canvas { background: transparent; border-radius: 14px; touch-action: none; filter: drop-shadow(0 12px 25px rgba(0,0,0,0.8)); }
+
+        .bottom-controls {
+            width: 100%; max-width: 420px; display: flex; align-items: center; justify-content: space-between;
+            background: rgba(15, 23, 42, 0.95); border: 1.5px solid rgba(255, 255, 255, 0.1);
+            border-radius: 14px; padding: 10px 14px; flex-shrink: 0;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        }
+        .power-wrapper-horizontal { display: flex; align-items: center; gap: 10px; flex-grow: 1; margin-right: 14px; }
+        .power-slider-h { width: 100%; height: 8px; cursor: pointer; transition: accent-color 0.2s ease; }
+        .power-label { font-size: 10px; font-weight: bold; min-width: 32px; text-align: right; transition: color 0.2s ease; }
+        .control-btn {
+            height: 36px; padding: 0 18px; background: #0ea5e9; border: none; border-radius: 10px;
+            color: #0f172a; font-size: 11px; font-weight: 800; cursor: pointer; display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 4px 15px rgba(14, 165, 233, 0.4);
+            transition: transform 0.1s ease;
+        }
+        .control-btn:active { transform: scale(0.95); }
+        .control-btn.place-btn { background: #10b981; box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4); color: #ffffff; }
+    </style>
+</head>
+<body>
+
+    <div class="game-container">
+        <div id="room-modal" class="room-modal">
+            <div class="room-card">
+                <div class="room-title">MULTIPLAYER ROOM</div>
+                <div class="room-desc">Masukkan kode room yang sama dengan teman Anda untuk mulai bermain bersama.</div>
+                <input type="text" id="room-input" class="room-input" placeholder="Contoh: MEJA123" maxlength="10">
+                <button id="join-room-btn" class="room-btn">GABUNG MEJA</button>
+            </div>
+        </div>
+
+        <div id="top-notif" class="top-notification">
+            <div class="notif-content-box">
+                <div id="notif-title" class="notif-title">MISSED</div>
+                <div id="notif-sub" class="notif-sub">Giliran Berpindah</div>
+            </div>
+        </div>
+
+        <div id="turn-banner" class="turn-banner">Menunggu Lawan Bergabung...</div>
+
+        <div class="top-players-hud">
+            <div id="p1-side" class="player-side-group active-turn">
+                <div id="p1-avatar" class="player-num-box">1</div>
+                <div class="score-info">
+                    <span id="p1-name" class="score-label">Player 1</span>
+                    <span id="p1-score" class="score-value">0</span>
+                </div>
+            </div>
+            <div class="vs-container">
+                <div class="vs-text">VS</div>
+                <div id="timer-display" class="timer-text">03:00</div>
+            </div>
+            <div id="p2-side" class="player-side-group p2-side">
+                <div class="score-info">
+                    <span id="p2-name" class="score-label">Player 2</span>
+                    <span id="p2-score" class="score-value">0</span>
+                </div>
+                <div id="p2-avatar" class="player-num-box">2</div>
+            </div>
+        </div>
+
+        <div class="board-layout">
+            <canvas id="pool-canvas"></canvas>
+        </div>
+
+        <div class="bottom-controls">
+            <div id="power-control-wrap" class="power-wrapper-horizontal">
+                <span style="font-size: 10px; color:#cbd5e1; font-weight:bold;">PWR</span>
+                <input type="range" id="power-slider" class="power-slider-h" min="1" max="100" value="50">
+                <span id="power-text" class="power-label" style="color: #facc15;">50%</span>
+            </div>
+            <button class="control-btn" id="shoot-btn" disabled style="opacity: 0.4;">TEMBAK</button>
+        </div>
+    </div>
+
+    <script>
+        const SOCKET_URL = "https://challenge-donald-charged-conditioning.trycloudflare.com";
+        const socket = io(SOCKET_URL);
+
+        let roomId = "";
+        let myPlayerNumber = 1; 
+        let opponentAimAngle = -Math.PI / 2;
+        let cachedRackNumbers = null;
+
+        let tg = window.Telegram?.WebApp;
+        if (tg) { tg.ready(); tg.expand(); }
+
+        const roomModal = document.getElementById('room-modal');
+        const roomInput = document.getElementById('room-input');
+        const joinRoomBtn = document.getElementById('join-room-btn');
+
+        let currentUser = tg?.initDataUnsafe?.user;
+        let p1Name = currentUser?.first_name || "Player 1";
+        let p2Name = "Player 2";
+
+        const p1NameEl = document.getElementById('p1-name');
+        const p2NameEl = document.getElementById('p2-name');
+        const p1AvatarEl = document.getElementById('p1-avatar');
+        const p2AvatarEl = document.getElementById('p2-avatar');
+
+        p1NameEl.innerText = p1Name;
+        if (currentUser?.photo_url) {
+            p1AvatarEl.innerHTML = `<img src="${currentUser.photo_url}" style="width:100%; height:100%; object-fit:cover;">`;
+        }
+
+        joinRoomBtn.addEventListener('click', () => {
+            let code = roomInput.value.trim();
+            if (!code) {
+                alert("Masukkan kode room terlebih dahulu!");
+                return;
+            }
+            roomId = code;
+            socket.emit('join_room', {
+                room: roomId,
+                name: p1Name,
+                photo_url: currentUser?.photo_url || ""
+            });
+            roomModal.style.display = 'none';
+        });
+
+        socket.on('assign_player', (num) => {
+            myPlayerNumber = num;
+            updateButtonState();
+        });
+
+        socket.on('start_game', (players) => {
+            let opponent = players.find(p => p.id !== socket.id);
+            let me = players.find(p => p.id === socket.id);
+
+            if (myPlayerNumber === 1) {
+                if (opponent) {
+                    p2Name = opponent.name;
+                    p2NameEl.innerText = p2Name;
+                    if (opponent.photo_url) {
+                        p2AvatarEl.innerHTML = `<img src="${opponent.photo_url}" style="width:100%; height:100%; object-fit:cover;">`;
+                    }
+                }
+            } else {
+                let p1 = players[0];
+                let p2 = players[1];
+                if (p1) {
+                    p1Name = p1.name;
+                    p1NameEl.innerText = p1Name;
+                    if (p1.photo_url) {
+                        p1AvatarEl.innerHTML = `<img src="${p1.photo_url}" style="width:100%; height:100%; object-fit:cover;">`;
+                    }
+                }
+                if (p2) {
+                    p2Name = p2.name;
+                    p2NameEl.innerText = p2Name;
+                    if (p2.photo_url) {
+                        p2AvatarEl.innerHTML = `<img src="${p2.photo_url}" style="width:100%; height:100%; object-fit:cover;">`;
+                    }
+                }
+            }
+            initGame();
+        });
+
+        socket.on('update_turn', (newTurnNum) => {
+            currentTurn = newTurnNum;
+            updateTurnUI();
+            updateButtonState();
+        });
+
+        socket.on('sync_rack', (receivedNumbers) => {
+            cachedRackNumbers = receivedNumbers;
+            setupRackWithNumbers(receivedNumbers);
+        });
+
+        socket.on('opponent_aim', (data) => {
+            opponentAimAngle = data.aimAngle;
+        });
+
+        socket.on('opponent_disconnected', () => {
+            showNotification("LAWAN KELUAR", "Menunggu lawan kembali...");
+        });
+
+        // SINKRONISASI POSISI AKHIR BOLA & ANTI-HILANGNYA BOLA PUTIH
+        socket.on('sync_ball_positions', (data) => {
+            data.balls.forEach(netBall => {
+                let localBall = balls.find(b => b.number === netBall.number && b.isCue === netBall.isCue);
+                if (localBall) {
+                    localBall.x = netBall.x;
+                    localBall.y = netBall.y;
+                    localBall.vx = 0;
+                    localBall.vy = 0;
+                    localBall.active = netBall.active;
+                    localBall.sinking = false;
+
+                    // Paksa bola putih selalu hidup dan siap jika sedang dalam mode penempatan
+                    if (localBall.isCue && cueBallInHand) {
+                        localBall.active = true;
+                    }
+                }
+            });
+        });
+
+        const canvas = document.getElementById('pool-canvas');
+        const ctx = canvas.getContext('2d', { alpha: false });
+        const powerSlider = document.getElementById('power-slider');
+        const powerText = document.getElementById('power-text');
+        const shootBtn = document.getElementById('shoot-btn');
+        const p1SideEl = document.getElementById('p1-side');
+        const p2SideEl = document.getElementById('p2-side');
+        const p1ScoreEl = document.getElementById('p1-score');
+        const p2ScoreEl = document.getElementById('p2-score');
+        const topNotif = document.getElementById('top-notif');
+        const notifTitle = document.getElementById('notif-title');
+        const notifSub = document.getElementById('notif-sub');
+        const timerDisplay = document.getElementById('timer-display');
+        const turnBanner = document.getElementById('turn-banner');
+
+        const LOGICAL_W = 350;
+        const LOGICAL_H = 600;
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+        canvas.width = LOGICAL_W * dpr;
+        canvas.height = LOGICAL_H * dpr;
+        ctx.scale(dpr, dpr);
+        canvas.style.width = LOGICAL_W + 'px';
+        canvas.style.height = LOGICAL_H + 'px';
+
+        let audioCtx = null;
+        function initAudio() {
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+
+        function playSound(type) {
+            initAudio();
+            if (!audioCtx) return;
+            let osc = audioCtx.createOscillator();
+            let gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            let now = audioCtx.currentTime;
+
+            if (type === 'hit') {
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(450, now);
+                osc.frequency.linearRampToValueAtTime(80, now + 0.08);
+                gain.gain.setValueAtTime(0.35, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.08);
+                osc.start(now); osc.stop(now + 0.08);
+            } else if (type === 'pocket') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(160, now);
+                osc.frequency.exponentialRampToValueAtTime(60, now + 0.2);
+                gain.gain.setValueAtTime(0.6, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
+                osc.start(now); osc.stop(now + 0.25);
+            }
+        }
+
+        const TABLE_X = 26; 
+        const TABLE_Y = 26;
+        const TABLE_W = LOGICAL_W - (TABLE_X * 2);
+        const TABLE_H = LOGICAL_H - (TABLE_Y * 2);
+        
+        const BALL_R = 7.8; 
+        const POCKET_VISUAL_R = BALL_R * 1.45;
+        const POCKET_PHYSICS_R = BALL_R * 2.15;
+
+        const pockets = [
+            {id: 0, x: TABLE_X - 2, y: TABLE_Y - 2},                                  
+            {id: 1, x: TABLE_X + TABLE_W + 2, y: TABLE_Y - 2},                        
+            {id: 2, x: TABLE_X, y: TABLE_Y + TABLE_H / 2},                    
+            {id: 3, x: TABLE_X + TABLE_W, y: TABLE_Y + TABLE_H / 2},          
+            {id: 4, x: TABLE_X - 2, y: TABLE_Y + TABLE_H + 2},                        
+            {id: 5, x: TABLE_X + TABLE_W + 2, y: TABLE_Y + TABLE_H + 2}               
+        ];
+
+        let balls = [];
+        let floatingTexts = [];
+        let aimAngle = -Math.PI / 2;
+        let isAiming = false;
+        let currentTurn = 1; 
+        let shotTaken = false;
+        let ballsEnteredThisShot = [];
+        let cueBallInHand = false;
+        let gameOver = false;
+
+        let p1Score = 0;
+        let p2Score = 0;
+
+        let turnTimeLeft = 180;
+        let timerInterval = null;
+
+        const poolColors = {
+            1: '#facc15', 2: '#2563eb', 3: '#dc2626', 4: '#7c3aed',
+            5: '#ea580c', 6: '#16a34a', 7: '#991b1b', 8: '#1e293b',
+            9: '#facc15', 10: '#2563eb', 11: '#dc2626', 12: '#7c3aed',
+            13: '#ea580c', 14: '#16a34a', 15: '#991b1b'
+        };
+
+        function startTurnTimer() {
+            clearInterval(timerInterval);
+            turnTimeLeft = 180;
+            updateTimerUI();
+            timerInterval = setInterval(() => {
+                if (gameOver || !areAllBallsStill()) return;
+                turnTimeLeft--;
+                updateTimerUI();
+                if (turnTimeLeft <= 0) {
+                    clearInterval(timerInterval);
+                    showNotification("WAKTU HABIS", "");
+                    switchTurnAndReset();
+                }
+            }, 1000);
+        }
+
+        function updateTimerUI() {
+            let m = Math.floor(turnTimeLeft / 60);
+            let s = turnTimeLeft % 60;
+            timerDisplay.innerText = `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+        }
+
+        function switchTurnAndReset() {
+            socket.emit('switch_turn', roomId);
+        }
+
+        function updatePowerUI(val) {
+            powerText.innerText = val + '%';
+            let color = val < 35 ? '#10b981' : (val < 75 ? '#facc15' : '#ef4444');
+            powerSlider.style.accentColor = color;
+            powerText.style.color = color;
+        }
+
+        powerSlider.addEventListener('input', () => {
+            updatePowerUI(parseInt(powerSlider.value));
+        });
+        updatePowerUI(50);
+
+        let notifTimeout = null;
+        function showNotification(title, sub = "", isWin = false) {
+            if (notifTimeout) clearTimeout(notifTimeout);
+            notifTitle.innerText = title;
+            notifSub.innerText = sub;
+            notifSub.style.display = sub === "" ? "none" : "block";
+            if (isWin) topNotif.classList.add('win-mode');
+            else topNotif.classList.remove('win-mode');
+            topNotif.classList.add('show');
+            notifTimeout = setTimeout(() => { if (!gameOver) topNotif.classList.remove('show'); }, 500);
+        }
+
+        function initGame() {
+            balls = [];
+            floatingTexts = [];
+            currentTurn = 1;
+            shotTaken = false;
+            ballsEnteredThisShot = [];
+            cueBallInHand = false;
+            gameOver = false;
+            p1Score = 0;
+            p2Score = 0;
+            topNotif.classList.remove('show');
+
+            updateScoreUI();
+            updateTurnUI();
+            updateButtonState();
+            startTurnTimer();
+
+            const centerX = TABLE_X + TABLE_W / 2;
+            balls.push({ x: centerX, y: TABLE_Y + TABLE_H - 95, vx: 0, vy: 0, number: 0, active: true, isCue: true, sinking: false, sinkProgress: 0 });
+
+            if (cachedRackNumbers) {
+                setupRackWithNumbers(cachedRackNumbers);
+            } else if (myPlayerNumber === 1) {
+                let numbers = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
+                numbers.sort(() => Math.random() - 0.5);
+                cachedRackNumbers = numbers;
+                socket.emit('sync_rack', { room: roomId, numbers: numbers });
+                setupRackWithNumbers(numbers);
+            }
+        }
+
+        function setupRackWithNumbers(numbers) {
+            balls = balls.filter(b => b.isCue);
+
+            const centerX = TABLE_X + TABLE_W / 2;
+            const rackY = TABLE_Y + 125;
+            const spacing = BALL_R * 2.05;
+            const rackPositions = [
+                {x: centerX, y: rackY},
+                {x: centerX - spacing/2, y: rackY + spacing * 0.866}, {x: centerX + spacing/2, y: rackY + spacing * 0.866},
+                {x: centerX - spacing, y: rackY + spacing * 1.732}, {x: centerX, y: rackY + spacing * 1.732}, {x: centerX + spacing, y: rackY + spacing * 1.732},
+                {x: centerX - spacing*1.5, y: rackY + spacing * 2.598}, {x: centerX - spacing/2, y: rackY + spacing * 2.598}, {x: centerX + spacing/2, y: rackY + spacing * 2.598}, {x: centerX + spacing*1.5, y: rackY + spacing * 2.598},
+                {x: centerX - spacing*2, y: rackY + spacing * 3.464}, {x: centerX - spacing, y: rackY + spacing * 3.464}, {x: centerX, y: rackY + spacing * 3.464}, {x: centerX + spacing, y: rackY + spacing * 3.464}, {x: centerX + spacing*2, y: rackY + spacing * 3.464}
+            ];
+
+            rackPositions.forEach((pos, index) => {
+                let n = numbers[index];
+                balls.push({ x: pos.x, y: pos.y, vx: 0, vy: 0, number: n, active: true, isCue: false, sinking: false, sinkProgress: 0 });
+            });
+        }
+
+        function updateScoreUI() {
+            p1ScoreEl.innerText = p1Score;
+            p2ScoreEl.innerText = p2Score;
+        }
+
+        function updateTurnUI() {
+            if (gameOver) return;
+            let activeName = currentTurn === 1 ? p1Name : p2Name;
+            turnBanner.innerText = `Giliran: ${activeName}`;
+
+            if (currentTurn === 1) {
+                p1SideEl.classList.add('active-turn');
+                p2SideEl.classList.remove('active-turn');
+            } else {
+                p2SideEl.classList.add('active-turn');
+                p1SideEl.classList.remove('active-turn');
+            }
+        }
+
+        function updateButtonState() {
+            let isMyTurn = (currentTurn === myPlayerNumber);
+
+            if (cueBallInHand && isMyTurn) {
+                shootBtn.innerText = "LETAKAN";
+                shootBtn.className = "control-btn place-btn";
+                shootBtn.style.opacity = "1";
+                shootBtn.disabled = false;
+            } else if (!isMyTurn) {
+                shootBtn.innerText = "GILIRAN LAWAN";
+                shootBtn.className = "control-btn";
+                shootBtn.style.opacity = "0.4";
+                shootBtn.disabled = true;
+            } else {
+                shootBtn.innerText = "TEMBAK";
+                shootBtn.className = "control-btn";
+                shootBtn.style.opacity = "1";
+                shootBtn.disabled = false;
+            }
+        }
+
+        function areAllBallsStill() {
+            return balls.every(b => !b.active || (Math.hypot(b.vx, b.vy) < 0.02 && !b.sinking));
+        }
+
+        function updateAimPosition(mx, my) {
+            let cue = balls.find(b => b.isCue && b.active);
+            if (!cue) return;
+            aimAngle = Math.atan2(my - cue.y, mx - cue.x);
+        }
+
+        canvas.addEventListener('pointerdown', (e) => {
+            if (gameOver || currentTurn !== myPlayerNumber) return;
+            let rect = canvas.getBoundingClientRect();
+            let mx = e.clientX - rect.left;
+            let my = e.clientY - rect.top;
+
+            if (!areAllBallsStill()) return;
+
+            let cue = balls.find(b => b.isCue && b.active);
+            if (cueBallInHand && cue) {
+                if (mx >= TABLE_X + BALL_R && mx <= TABLE_X + TABLE_W - BALL_R &&
+                    my >= TABLE_Y + BALL_R && my <= TABLE_Y + TABLE_H - BALL_R) {
+                    cue.x = mx; cue.y = my;
+                }
+                return;
+            }
+
+            isAiming = true;
+            updateAimPosition(mx, my);
+            socket.emit('aim_move', { room: roomId, aimAngle: aimAngle });
+        });
+
+        canvas.addEventListener('pointermove', (e) => {
+            if (gameOver || currentTurn !== myPlayerNumber) return;
+            let rect = canvas.getBoundingClientRect();
+            let mx = e.clientX - rect.left;
+            let my = e.clientY - rect.top;
+            let cue = balls.find(b => b.isCue && b.active);
+
+            if (cueBallInHand && cue && e.buttons === 1) {
+                if (mx >= TABLE_X + BALL_R && mx <= TABLE_X + TABLE_W - BALL_R &&
+                    my >= TABLE_Y + BALL_R && my <= TABLE_Y + TABLE_H - BALL_R) {
+                    cue.x = mx; cue.y = my;
+                }
+                return;
+            }
+
+            if (isAiming && !cueBallInHand) {
+                updateAimPosition(mx, my);
+                socket.emit('aim_move', { room: roomId, aimAngle: aimAngle });
+            }
+        });
+
+        window.addEventListener('pointerup', () => { isAiming = false; });
+        window.addEventListener('pointercancel', () => { isAiming = false; });
+
+        function executeShot(powerPercent) {
+            initAudio();
+            let cue = balls.find(b => b.isCue && b.active);
+            if (!cue) return;
+
+            let powerVal = (powerPercent / 100) * 27;
+            cue.vx = Math.cos(aimAngle) * powerVal;
+            cue.vy = Math.sin(aimAngle) * powerVal;
+            playSound('hit');
+            shotTaken = true;
+            ballsEnteredThisShot = [];
+            clearInterval(timerInterval);
+        }
+
+        shootBtn.addEventListener('pointerdown', (e) => {
+            e.stopPropagation();
+            if (gameOver || !areAllBallsStill() || currentTurn !== myPlayerNumber) return;
+
+            if (cueBallInHand) {
+                cueBallInHand = false;
+                updateButtonState();
+                return;
+            }
+
+            let powerPercent = parseInt(powerSlider.value);
+
+            socket.emit('shoot', {
+                room: roomId,
+                aimAngle: aimAngle,
+                power: powerPercent
+            });
+
+            executeShot(powerPercent);
+        });
+
+        socket.on('opponent_shoot', (data) => {
+            aimAngle = data.aimAngle;
+            executeShot(data.power);
+        });
+
+        let wasMoving = false;
+
+        function loop() {
+            ctx.fillStyle = '#090d16';
+            ctx.fillRect(0, 0, LOGICAL_W, LOGICAL_H);
+
+            let lampGrad = ctx.createRadialGradient(
+                LOGICAL_W / 2, LOGICAL_H / 2, 30,
+                LOGICAL_W / 2, LOGICAL_H / 2, LOGICAL_W * 0.9
+            );
+            lampGrad.addColorStop(0, 'rgba(14, 165, 233, 0.18)');
+            lampGrad.addColorStop(1, 'rgba(3, 7, 18, 0.4)');
+            ctx.fillStyle = lampGrad;
+            ctx.fillRect(0, 0, LOGICAL_W, LOGICAL_H);
+
+            ctx.beginPath();
+            ctx.roundRect(2, 2, LOGICAL_W - 4, LOGICAL_H - 4, 20);
+            let woodGrad = ctx.createLinearGradient(0, 2, 0, LOGICAL_H);
+            woodGrad.addColorStop(0, '#1e293b');
+            woodGrad.addColorStop(0.5, '#0f172a');
+            woodGrad.addColorStop(1, '#090d16');
+            ctx.fillStyle = woodGrad;
+            ctx.fill();
+            ctx.lineWidth = 4;
+            ctx.strokeStyle = '#334155';
+            ctx.stroke();
+            ctx.closePath();
+
+            const railThickness = 10;
+
+            const railGradTop = ctx.createLinearGradient(0, TABLE_Y - railThickness, 0, TABLE_Y);
+            railGradTop.addColorStop(0, '#1b3857');
+            railGradTop.addColorStop(1, '#112236');
+            ctx.fillStyle = railGradTop;
+            ctx.beginPath();
+            ctx.roundRect(TABLE_X - 5, TABLE_Y - railThickness, TABLE_W + 10, railThickness, 4);
+            ctx.fill();
+            ctx.closePath();
+
+            const railGradBottom = ctx.createLinearGradient(0, TABLE_Y + TABLE_H, 0, TABLE_Y + TABLE_H + railThickness);
+            railGradBottom.addColorStop(0, '#112236');
+            railGradBottom.addColorStop(1, '#1b3857');
+            ctx.fillStyle = railGradBottom;
+            ctx.beginPath();
+            ctx.roundRect(TABLE_X - 5, TABLE_Y + TABLE_H, TABLE_W + 10, railThickness, 4);
+            ctx.fill();
+            ctx.closePath();
+
+            const railGradLeft = ctx.createLinearGradient(TABLE_X - railThickness, 0, TABLE_X, 0);
+            railGradLeft.addColorStop(0, '#1b3857');
+            railGradLeft.addColorStop(1, '#112236');
+            ctx.fillStyle = railGradLeft;
+            ctx.beginPath();
+            ctx.roundRect(TABLE_X - railThickness, TABLE_Y - 5, railThickness, TABLE_H + 10, 4);
+            ctx.fill();
+            ctx.closePath();
+
+            const railGradRight = ctx.createLinearGradient(TABLE_X + TABLE_W, 0, TABLE_X + TABLE_W + railThickness, 0);
+            railGradRight.addColorStop(0, '#112236');
+            railGradRight.addColorStop(1, '#1b3857');
+            ctx.fillStyle = railGradRight;
+            ctx.beginPath();
+            ctx.roundRect(TABLE_X + TABLE_W, TABLE_Y - 5, railThickness, TABLE_H + 10, 4);
+            ctx.fill();
+            ctx.closePath();
+
+            ctx.fillStyle = '#162d46';
+            pockets.forEach(p => {
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, POCKET_VISUAL_R + 5, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.closePath();
+            });
+
+            let feltGrad = ctx.createRadialGradient(
+                TABLE_X + TABLE_W / 2, TABLE_Y + TABLE_H / 2, 50,
+                TABLE_X + TABLE_W / 2, TABLE_Y + TABLE_H / 2, TABLE_W * 0.75
+            );
+            feltGrad.addColorStop(0, '#31679b');
+            feltGrad.addColorStop(1, '#204369');
+            ctx.fillStyle = feltGrad;
+            ctx.fillRect(TABLE_X, TABLE_Y, TABLE_W, TABLE_H);
+
+            pockets.forEach(p => {
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, POCKET_VISUAL_R + 2, 0, Math.PI * 2);
+                ctx.fillStyle = '#475569';
+                ctx.fill();
+                ctx.closePath();
+
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, POCKET_VISUAL_R, 0, Math.PI * 2);
+                ctx.fillStyle = '#020617';
+                ctx.fill();
+                ctx.closePath();
+            });
+
+            const substeps = 16; 
+            for (let step = 0; step < substeps; step++) {
+                balls.forEach(b => {
+                    if (!b.active) return;
+
+                    if (b.sinking) {
+                        b.x += (b.sinkPocket.x - b.x) * 0.28;
+                        b.y += (b.sinkPocket.y - b.y) * 0.28;
+                        b.sinkProgress += 0.085;
+                        if (b.sinkProgress >= 1) {
+                            b.active = false;
+                            b.sinking = false;
+                            
+                            if (b.isCue) {
+                                cueBallInHand = true;
+                                showNotification("FOUL");
+                                updateButtonState();
+                                
+                                // Reset langsung posisi bola putih ke tengah tanpa timeout berlebih
+                                b.x = TABLE_X + TABLE_W / 2; 
+                                b.y = TABLE_Y + TABLE_H - 95; 
+                                b.vx = 0; 
+                                b.vy = 0; 
+                                b.active = true; 
+                                b.sinking = false; 
+                                b.sinkProgress = 0;
+                            } else {
+                                let pts = b.number * 10;
+                                if (currentTurn === 1) {
+                                    p1Score += pts;
+                                } else {
+                                    p2Score += pts;
+                                }
+                                updateScoreUI();
+
+                                floatingTexts.push({
+                                    text: `+${pts}`,
+                                    x: TABLE_X + TABLE_W / 2,
+                                    y: TABLE_Y + TABLE_H / 2,
+                                    alpha: 1.0,
+                                    vy: -0.65
+                                });
+
+                                if (!ballsEnteredThisShot.includes(b.number)) {
+                                    ballsEnteredThisShot.push(b.number);
+                                }
+                            }
+                        }
+                        return;
+                    }
+                    
+                    let pocketHit = null;
+                    pockets.forEach(p => {
+                        if (Math.hypot(b.x - p.x, b.y - p.y) < POCKET_PHYSICS_R) pocketHit = p;
+                    });
+
+                    if (pocketHit) {
+                        b.sinking = true;
+                        b.sinkProgress = 0;
+                        b.sinkPocket = pocketHit;
+                        b.vx = 0; b.vy = 0;
+                        playSound('pocket');
+                        return;
+                    }
+
+                    b.x += b.vx / substeps;
+                    b.y += b.vy / substeps;
+                    
+                    b.vx *= Math.pow(0.989, 1 / substeps);
+                    b.vy *= Math.pow(0.989, 1 / substeps);
+
+                    if (Math.hypot(b.vx, b.vy) < 0.01) { b.vx = 0; b.vy = 0; }
+
+                    const restitution = 0.78; 
+                    if (b.x - BALL_R <= TABLE_X) { b.x = TABLE_X + BALL_R; b.vx *= -restitution; playSound('hit'); }
+                    if (b.x + BALL_R >= TABLE_X + TABLE_W) { b.x = TABLE_X + TABLE_W - BALL_R; b.vx *= -restitution; playSound('hit'); }
+                    if (b.y - BALL_R <= TABLE_Y) { b.y = TABLE_Y + BALL_R; b.vy *= -restitution; playSound('hit'); }
+                    if (b.y + BALL_R >= TABLE_Y + TABLE_H) { b.y = TABLE_Y + TABLE_H - BALL_R; b.vy *= -restitution; playSound('hit'); }
+                });
+
+                for (let i = 0; i < balls.length; i++) {
+                    for (let j = i + 1; j < balls.length; j++) {
+                        let b1 = balls[i], b2 = balls[j];
+                        if (!b1.active || !b2.active || b1.sinking || b2.sinking) continue;
+
+                        let dx = b2.x - b1.x;
+                        let dy = b2.y - b1.y;
+                        let dist = Math.hypot(dx, dy);
+                        let minDist = BALL_R * 2;
+
+                        if (dist < minDist) {
+                            let nx = dx / dist;
+                            let ny = dy / dist;
+
+                            let overlap = (minDist - dist) * 0.5;
+                            b1.x -= overlap * nx;
+                            b1.y -= overlap * ny;
+                            b2.x += overlap * nx;
+                            b2.y += overlap * ny;
+
+                            let kx = b1.vx - b2.vx;
+                            let ky = b1.vy - b2.vy;
+                            let p = 2 * (nx * kx + ny * ky) / 2.0;
+
+                            if (p > 0) {
+                                let ballRestitution = 0.95;
+                                b1.vx -= p * nx * ballRestitution;
+                                b1.vy -= p * ny * ballRestitution;
+                                b2.vx += p * nx * ballRestitution;
+                                b2.vy += p * ny * ballRestitution;
+
+                                if (Math.hypot(kx, ky) > 0.15) {
+                                    playSound('hit');
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            let ballsStill = areAllBallsStill();
+
+            if (!ballsStill) {
+                wasMoving = true;
+            } else if (wasMoving && ballsStill) {
+                wasMoving = false;
+                if (shotTaken && !gameOver) {
+                    shotTaken = false;
+
+                    // Kirim posisi final ke pemain lawan
+                    if (currentTurn === myPlayerNumber) {
+                        let ballDataToSend = balls.map(b => ({
+                            number: b.number,
+                            isCue: b.isCue,
+                            x: b.x,
+                            y: b.y,
+                            active: b.active
+                        }));
+                        socket.emit('sync_ball_positions', {
+                            room: roomId,
+                            balls: ballDataToSend
+                        });
+                    }
+
+                    let hitFoulWhite = cueBallInHand;
+                    let scoredAny = ballsEnteredThisShot.length > 0;
+                    let allBallsCleared = balls.filter(b => !b.isCue).every(b => !b.active);
+
+                    if (allBallsCleared) {
+                        gameOver = true;
+                        if (p1Score > p2Score) {
+                            showNotification(`${p1Name} MENANG!\n` + p1Score + " vs " + p2Score, "", true);
+                        } else if (p2Score > p1Score) {
+                            showNotification(`${p2Name} MENANG!\n` + p2Score + " vs " + p1Score, "", true);
+                        } else {
+                            showNotification("SERI!\nSkor: " + p1Score, "", true);
+                        }
+                    } else {
+                        if (hitFoulWhite || !scoredAny) {
+                            if (hitFoulWhite) {
+                                showNotification("FOUL");
+                            } else {
+                                showNotification("MISSED");
+                            }
+                            switchTurnAndReset();
+                        } else {
+                            startTurnTimer();
+                        }
+                    }
+                    updateButtonState();
+                }
+            }
+
+            let cue = balls.find(b => b.isCue && b.active);
+
+            if (cue && ballsStill && !cueBallInHand && !gameOver) {
+                let activeAimAngle = (currentTurn === myPlayerNumber) ? aimAngle : opponentAimAngle;
+
+                let closestBall = null;
+                let minDist = Infinity;
+                let hitPoint = null;
+
+                let rayDirX = Math.cos(activeAimAngle);
+                let rayDirY = Math.sin(activeAimAngle);
+
+                balls.forEach(b => {
+                    if (b.isCue || !b.active || b.sinking) return;
+                    let toBallX = b.x - cue.x;
+                    let toBallY = b.y - cue.y;
+                    let proj = toBallX * rayDirX + toBallY * rayDirY;
+
+                    if (proj > 0) {
+                        let cx = cue.x + rayDirX * proj;
+                        let cy = cue.y + rayDirY * proj;
+                        let distToLine = Math.hypot(b.x - cx, b.y - cy);
+
+                        if (distToLine < BALL_R * 2 && proj < minDist) {
+                            let backDist = Math.sqrt((BALL_R * 2) * (BALL_R * 2) - distToLine * distToLine);
+                            let hitDist = proj - backDist;
+                            if (hitDist > 0 && hitDist < minDist) {
+                                minDist = hitDist;
+                                closestBall = b;
+                                hitPoint = {
+                                    x: cue.x + rayDirX * hitDist,
+                                    y: cue.y + rayDirY * hitDist
+                                };
+                            }
+                        }
+                    }
+                });
+
+                ctx.save();
+                let endX = hitPoint ? hitPoint.x : cue.x + rayDirX * 150;
+                let endY = hitPoint ? hitPoint.y : cue.y + rayDirY * 150;
+
+                ctx.beginPath();
+                ctx.moveTo(cue.x, cue.y);
+                ctx.lineTo(endX, endY);
+                ctx.strokeStyle = currentTurn === myPlayerNumber ? 'rgba(56, 189, 248, 0.32)' : 'rgba(239, 68, 68, 0.32)';
+                ctx.lineWidth = 16; 
+                ctx.lineCap = 'round';
+                ctx.stroke();
+                ctx.closePath();
+
+                if (closestBall && hitPoint) {
+                    ctx.beginPath();
+                    ctx.arc(hitPoint.x, hitPoint.y, BALL_R, 0, Math.PI * 2);
+                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+                    ctx.lineWidth = 1.2;
+                    ctx.stroke();
+                    ctx.closePath();
+
+                    let targetAngle = Math.atan2(closestBall.y - hitPoint.y, closestBall.x - hitPoint.x);
+                    let tEndX = closestBall.x + Math.cos(targetAngle) * 70;
+                    let tEndY = closestBall.y + Math.sin(targetAngle) * 70;
+
+                    ctx.beginPath();
+                    ctx.moveTo(closestBall.x, closestBall.y);
+                    ctx.lineTo(tEndX, tEndY);
+                    ctx.strokeStyle = 'rgba(250, 204, 21, 0.32)';
+                    ctx.lineWidth = 11;
+                    ctx.lineCap = 'round';
+                    ctx.stroke();
+                    ctx.closePath();
+                }
+                ctx.restore();
+            }
+
+            balls.forEach(b => {
+                if (!b.active) return;
+
+                let currentR = BALL_R * Math.max(0, (1 - b.sinkProgress));
+                if (currentR <= 0) return;
+
+                if (!b.sinking) {
+                    ctx.beginPath();
+                    ctx.arc(b.x + 1.5, b.y + 2.2, currentR, 0, Math.PI * 2);
+                    ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+                    ctx.fill();
+                    ctx.closePath();
+                }
+
+                if (b.isCue) {
+                    ctx.beginPath();
+                    ctx.arc(b.x, b.y, currentR, 0, Math.PI * 2);
+                    let whiteGrad = ctx.createRadialGradient(b.x - 2, b.y - 2, 0.5, b.x, b.y, currentR);
+                    whiteGrad.addColorStop(0, '#ffffff');
+                    whiteGrad.addColorStop(0.7, '#e2e8f0');
+                    whiteGrad.addColorStop(1, '#cbd5e1');
+                    ctx.fillStyle = whiteGrad;
+                    ctx.fill();
+                    ctx.closePath();
+
+                    if (cueBallInHand && !b.sinking && currentTurn === myPlayerNumber) {
+                        let pulse = (Math.sin(Date.now() / 150) + 1) / 2;
+                        ctx.beginPath();
+                        ctx.arc(b.x, b.y, currentR + 3.5, 0, Math.PI * 2);
+                        ctx.strokeStyle = `rgba(16, 185, 129, ${0.4 + pulse * 0.6})`;
+                        ctx.lineWidth = 2;
+                        ctx.stroke();
+                        ctx.closePath();
+                    }
+                } else {
+                    let isStripe = b.number > 8;
+                    let baseCol = poolColors[b.number];
+
+                    ctx.beginPath();
+                    ctx.arc(b.x, b.y, currentR, 0, Math.PI * 2);
+                    ctx.fillStyle = isStripe ? '#f8fafc' : baseCol;
+                    ctx.fill();
+                    ctx.closePath();
+
+                    if (isStripe && currentR > 3) {
+                        ctx.save();
+                        ctx.beginPath();
+                        ctx.arc(b.x, b.y, currentR, 0, Math.PI * 2);
+                        ctx.clip();
+                        ctx.fillStyle = baseCol;
+                        ctx.fillRect(b.x - currentR, b.y - currentR * 0.5, currentR * 2, currentR);
+                        ctx.restore();
+                    }
+
+                    if (currentR > 4) {
+                        ctx.beginPath();
+                        ctx.arc(b.x, b.y, currentR * 0.5, 0, Math.PI * 2);
+                        ctx.fillStyle = '#ffffff';
+                        ctx.fill();
+                        ctx.closePath();
+
+                        ctx.fillStyle = '#0f172a';
+                        ctx.font = 'bold 6px sans-serif';
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+                        ctx.fillText(b.number, b.x, b.y);
+                    }
+                }
+
+                if (!b.sinking) {
+                    ctx.beginPath();
+                    ctx.arc(b.x - 2.5, b.y - 2.5, 1.6, 0, Math.PI * 2);
+                    ctx.fillStyle = 'rgba(255, 255, 255, 0.75)';
+                    ctx.fill();
+                    ctx.closePath();
+                }
+            });
+
+            floatingTexts.forEach(ft => {
+                ft.y += ft.vy;
+                ft.alpha -= 0.022;
+                if (ft.alpha > 0) {
+                    ctx.save();
+                    ctx.globalAlpha = Math.max(0, ft.alpha);
+                    ctx.font = '900 24px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+                    ctx.fillStyle = '#ffffff';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.shadowColor = 'rgba(0, 0, 0, 0.95)';
+                    ctx.shadowBlur = 10;
+                    ctx.fillText(ft.text, ft.x, ft.y);
+                    ctx.restore();
+                }
+            });
+            floatingTexts = floatingTexts.filter(ft => ft.alpha > 0);
+
+            requestAnimationFrame(loop);
+        }
+
+        loop();
+    </script>
+</body>
+</html>
